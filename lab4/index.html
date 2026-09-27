@@ -29,6 +29,7 @@ main{padding:16px 22px 48px;max-width:1560px;margin:0 auto}
 .stack{display:flex;flex-direction:column;gap:16px;min-width:0}
 .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
 @media (max-width:1200px){.two{grid-template-columns:1fr}}
+@media (max-width:980px){#tab3 .layout>.stack:last-child{order:-1}}
 .card{background:var(--card);border:1px solid #DCE4EA;border-radius:12px;padding:14px 16px;box-shadow:0 1px 2px rgba(23,50,77,.06);min-width:0}
 .card h2{margin:0 0 4px;font-size:1.08rem;color:var(--brand)}
 .card h3{margin:14px 0 6px;font-size:.95rem;color:var(--brand)}
@@ -80,6 +81,7 @@ details summary{cursor:pointer;color:var(--brand);font-weight:700;font-size:.92r
 .bar .ghost{position:absolute;top:0;bottom:0;width:3px;background:var(--orange);transition:left .35s ease}
 .bar .v{font-variant-numeric:tabular-nums;color:var(--mid);font-size:.85rem}
 .bar.picked .fill{background:var(--orange)}
+@media (max-width:600px){.bar{grid-template-columns:6.5em minmax(0,1fr) 6.5em;gap:6px;font-size:.85rem}.row.wrap-sm{flex-wrap:wrap!important}}
 .sentence{font-family:Menlo,Consolas,monospace;font-size:1.12rem;color:var(--brand);display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:36px}
 .sentence .tok{background:var(--paleblue);border:1px solid #CFDDE7;border-radius:6px;padding:2px 8px}
 .sentence .tok.start{background:#E1ECF3;font-family:inherit;font-weight:700;font-size:.9rem}
@@ -118,6 +120,13 @@ table.t tr.hit td{background:#FFF3E8}
 .calc b{color:var(--brand)}
 .kbd{font-family:Menlo,monospace;font-size:.78rem;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;background:#fff;color:var(--brand)}
 #selftest{font-family:Menlo,monospace;font-size:13px;white-space:pre;padding:12px 22px;display:none}
+a.cite{color:var(--teal);font-weight:700;text-decoration:none}
+a.cite:hover{text-decoration:underline}
+#tab4 .card{max-width:920px}
+.refs{list-style:none;margin:0;padding:0}
+.refs li{margin:12px 0;line-height:1.45}
+.refs .rn{font-weight:700;color:var(--brand);margin-right:6px}
+.refs a{color:var(--teal);word-break:break-all}
 </style>
 </head>
 <body>
@@ -127,6 +136,7 @@ table.t tr.hit td{background:#FFF3E8}
     <button data-tab="1" class="active"><span class="k">1</span>Areas, not points</button>
     <button data-tab="2"><span class="k">2</span>Next-word prediction</button>
     <button data-tab="3"><span class="k">3</span>Naive Bayes</button>
+    <button data-tab="4"><span class="k">4</span>References</button>
   </nav>
   <div class="hdr-right">Text size <button id="zoomOut" title="Smaller text">A−</button><button id="zoomIn" title="Larger text">A+</button></div>
 </header>
@@ -181,7 +191,7 @@ table.t tr.hit td{background:#FFF3E8}
     <div class="stack">
       <div class="card">
         <h2>2 · Next-word prediction</h2>
-        <p class="lead">A bigram model: P(next | current) = count(current → next) ÷ count(current → anything). Edit the corpus and the model retrains instantly.</p>
+        <p class="lead">A bigram model <a class="cite" href="#tab4">[2]</a>: P(next | current) = count(current → next) ÷ count(current → anything). Edit the corpus and the model retrains instantly.</p>
         <h3>Training corpus (one sentence per line)</h3>
         <textarea id="t2corpus" class="mono" rows="10" spellcheck="false"></textarea>
         <div class="row"><button class="btn" id="t2reset">Reset to the handout corpus</button><span class="sub" id="t2stats"></span></div>
@@ -189,8 +199,8 @@ table.t tr.hit td{background:#FFF3E8}
       </div>
       <div class="card">
         <h3>Your ID digits (task 2.2)</h3>
-        <p class="lead" style="margin-bottom:6px">Digits are read from the <b>last</b> one leftwards; a word with one next word uses no digit.</p>
-        <div class="row" style="flex-wrap:nowrap"><input type="text" id="t2digits" class="mono" placeholder="e.g. 100012338" inputmode="numeric"><button class="btn primary" id="t2digitsGo">Generate</button></div>
+        <p class="lead" style="margin-bottom:6px">Start with the <b>last</b> digit and move left; a word with only one next word uses no digit.</p>
+        <div class="row wrap-sm" style="flex-wrap:nowrap"><input type="text" id="t2digits" class="mono" placeholder="e.g. 100012338" inputmode="numeric"><button class="btn primary" id="t2digitsGo">Generate</button></div>
         <div class="sub" id="t2digitsOut"></div>
       </div>
     </div>
@@ -217,11 +227,11 @@ table.t tr.hit td{background:#FFF3E8}
           <label class="check"><input type="checkbox" id="t2smooth"> Add-one smoothing (every pair gets count + 1)</label>
         </div>
         <div class="card">
-          <h3>Generate 20 sentences</h3>
-          <div class="row" style="margin-top:0"><button class="btn warm" id="t2gen20">Generate 20 at this T</button><span class="sub" id="t2genSum"></span></div>
+          <h3>Generate 50 sentences</h3>
+          <div class="row" style="margin-top:0"><button class="btn warm" id="t2gen20">Generate 50 at this T</button><span class="sub" id="t2genSum"></span></div>
           <div class="list" id="t2list"></div>
           <h3>Score a sentence</h3>
-          <div class="row" style="flex-wrap:nowrap;margin-top:0"><input type="text" id="t2score" class="mono" value="ai is everywhere ."><button class="btn" id="t2scoreGo">Score</button></div>
+          <div class="row wrap-sm" style="flex-wrap:nowrap;margin-top:0"><input type="text" id="t2score" class="mono" value="ai is everywhere ."><button class="btn" id="t2scoreGo">Score</button></div>
           <div class="factors" id="t2factors"></div>
         </div>
       </div>
@@ -235,7 +245,7 @@ table.t tr.hit td{background:#FFF3E8}
     <div class="stack">
       <div class="card">
         <h2>3 · Naive Bayes in NLP</h2>
-        <p class="lead">Data from Jurafsky &amp; Martin, <i>Speech and Language Processing</i>, Appendix B. Score(C) = P(C) × P(word₁ | C) × P(word₂ | C) × … ; words that never occur in training are dropped.</p>
+        <p class="lead">Data from <a class="cite" href="#tab4">[1]</a>; method as in <a class="cite" href="#tab4">[2]</a>. Score(C) = P(C) × P(word₁ | C) × P(word₂ | C) × …, and P(C | review) = Score(C) ÷ (sum of all scores). Words that never occur in training are dropped.</p>
         <h3>Data set</h3>
         <div class="seg" id="t3data">
           <button data-d="sent" class="active">Movie reviews (B.3)</button>
@@ -278,6 +288,20 @@ table.t tr.hit td{background:#FFF3E8}
         </div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ============================================================ TAB 4 -->
+<section class="tab" id="tab4">
+  <div class="card">
+    <h2>References</h2>
+    <ol class="refs">
+      <li id="ref1"><span class="rn">[1]</span>D. Jurafsky and J. H. Martin. <i>Speech and Language Processing</i>, 3rd ed. draft, 2026. Appendix B: Naive Bayes, Text Classification, and Sentiment. <a href="https://web.stanford.edu/~jurafsky/slp3/B.pdf" target="_blank" rel="noopener">https://web.stanford.edu/~jurafsky/slp3/B.pdf</a>
+        <div class="sub">Tab 3: the movie reviews are the worked example of Section B.3; <i>Comedy or action</i> is Exercise B.2.</div></li>
+      <li id="ref2"><span class="rn">[2]</span>R. Bresson and Z. Iklassov. <i>Week 5: Introduction to Probability for AI</i>. AI1010 lecture slides, MBZUAI, 2026.
+        <div class="sub">Tabs 1–3 follow its notation: densities and areas (slides 50–53), the Markov chain and next-token prediction (slides 54–55), Naive Bayes (slide 60).</div></li>
+    </ol>
+    <p class="sub">The Tab 2 corpus was written for this lab.</p>
   </div>
 </section>
 </main>
@@ -333,8 +357,9 @@ function fmt(x, sig = 3) {
     if (s.includes(".")) s = s.replace(/0+$/, "").replace(/\.$/, "");
     return s;
   }
-  const e = Math.floor(Math.log10(ax));
-  const m = parseFloat((x / 10 ** e).toPrecision(sig));
+  let e = Math.floor(Math.log10(ax));
+  let m = parseFloat((x / 10 ** e).toPrecision(sig));
+  if (Math.abs(m) >= 10) { m = parseFloat((m / 10).toPrecision(sig)); e += 1; }
   return `${m} × 10${String(e).split("").map(c => SUP[c]).join("")}`;
 }
 const fmtNum = (x, d = 1) => (Math.round(x * 10 ** d) / 10 ** d).toString();
@@ -372,9 +397,10 @@ $("#zoomIn").onclick = () => { zoom = Math.min(26, zoom + 1); applyZoom(); };
 $("#zoomOut").onclick = () => { zoom = Math.max(13, zoom - 1); applyZoom(); };
 applyZoom();
 document.addEventListener("keydown", e => {
-  if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
-  if (["1", "2", "3"].includes(e.key)) showTab(+e.key);
+  if (e.target.matches && e.target.matches("input[type=text], textarea, select")) return;
+  if (["1", "2", "3", "4"].includes(e.key)) showTab(+e.key);
 });
+$$("a.cite").forEach(a => a.addEventListener("click", e => { e.preventDefault(); showTab(4); }));
 
 /* ============================================================ TAB 1: continuous */
 const T1 = { kind: "uniform", uniform: { w: 20 }, triangle: { a: 20, c: 30, b: 40 }, normal: { mu: 38, sd: 2 },
@@ -582,8 +608,8 @@ window.addEventListener("pointerup", () => { $("#t1svg").onpointermove = null; T
 $$("#t1kind button").forEach(b => b.addEventListener("click", () => {
   cancelAnimationFrame(T1.anim); T1.kind = b.dataset.k; T1.darts = []; [T1.lo, T1.hi] = D1().start; setupT1Controls(); renderT1();
 }));
-$("#t1lo").addEventListener("input", e => { T1.lo = +e.target.value; syncIntervalSliders(); renderT1(); });
-$("#t1hi").addEventListener("input", e => { T1.hi = +e.target.value; syncIntervalSliders(); renderT1(); });
+$("#t1lo").addEventListener("input", e => { T1.lo = Math.min(+e.target.value, T1.hi); syncIntervalSliders(); renderT1(); });
+$("#t1hi").addEventListener("input", e => { T1.hi = Math.max(+e.target.value, T1.lo); syncIntervalSliders(); renderT1(); });
 $("#t1bands").addEventListener("change", e => { T1.bands = e.target.checked; renderT1(); });
 $("#t1darts").addEventListener("click", () => { const D = D1(); for (let i = 0; i < 1000 && T1.darts.length < 4000; i++) T1.darts.push({ x: D.sample(), u: Math.random() }); renderT1(); });
 $("#t1clear").addEventListener("click", () => { T1.darts = []; renderT1(); });
@@ -605,7 +631,7 @@ const START = "START", END = ".";
 const DEFAULT_CORPUS = ["i study ai .", "i study ai at mbzuai .", "i study at mbzuai .", "i study hard .", "i love coffee .",
   "we study ai .", "we love ai .", "ai is fun .", "robots are fun .", "robots are everywhere ."].join("\n");
 function tokenizeText(text) {
-  return text.toLowerCase().replace(/[.!?]+/g, " . ").replace(/[^a-z0-9'. ]+/g, " ").split(/\s+/).filter(Boolean);
+  return text.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/[.!?]+/g, " . ").replace(/[^a-z0-9'. ]+/g, " ").split(/\s+/).map(w => w.replace(/^'+|'+$/g, "")).filter(Boolean);
 }
 function buildLM(text) {
   const sents = [];
@@ -687,16 +713,18 @@ function scoreSentence(lm, tokens, k) {
 const T2 = { text: DEFAULT_CORPUS, lm: null, T: 1, smooth: 0, words: [], digitsUsed: [], view: START, lastPick: null, timer: 0 };
 function curWord() { return T2.words.length ? T2.words[T2.words.length - 1] : START; }
 function rebuildLM() {
-  T2.lm = buildLM(T2.text); T2.words = []; T2.digitsUsed = []; T2.view = START;
+  clearInterval(T2.timer); T2.lm = buildLM(T2.text); T2.words = []; T2.digitsUsed = []; T2.view = START; T2.lastPick = null;
   const lm = T2.lm;
   $("#t2stats").textContent = `${lm.sents.length} sentences · ${lm.vocab.length - (lm.vocab.includes(END) ? 1 : 0)} words + “.”`;
-  renderT2Table(); renderT2();
+  $("#t2list").innerHTML = ""; $("#t2genSum").textContent = ""; $("#t2digitsOut").textContent = "";
+  renderT2Table(); renderT2(); runScore();
 }
 function renderT2Table() {
   const lm = T2.lm, rows = [];
   const ctxs = [START, ...[...lm.order.keys()].filter(a => a !== START)];
   for (const a of ctxs) {
     const list = lm.order.get(a), n = lm.totals.get(a), rg = digitRanges(lm, a);
+    if (!list) continue;
     list.forEach(([w, c], i) => {
       const r = rg && list.length > 1 ? rg[i] : null;
       rows.push(`<tr>${i === 0 ? `<td class="w l" rowspan="${list.length}">${esc(a)}</td>` : ""}<td class="w l">${esc(w)}</td><td>${c}/${n}</td><td>${fmt(c / n, 3)}</td><td>${r ? (r[1] === r[2] ? r[1] : r[1] + "–" + r[2]) : list.length === 1 ? "—" : "n/a"}</td></tr>`);
@@ -744,7 +772,7 @@ function renderT2() {
 function t2Step() {
   const a = curWord(); if (a === END) return;
   const list = temper(nextList(T2.lm, a, T2.smooth), T2.T);
-  if (!list.length) return;
+  if (!list.length) { clearInterval(T2.timer); return; }
   const w = sampleFrom(list);
   T2.pickCtx = a; T2.lastPick = w; T2.words.push(w); T2.digitsUsed.push(null); T2.view = a;
   renderT2();
@@ -753,7 +781,7 @@ function t2Step() {
 }
 function generateOne(lm, T, k) {
   const out = []; let a = START;
-  for (let i = 0; i < 30 && a !== END; i++) { const w = sampleFrom(temper(nextList(lm, a, k), T)); out.push(w); a = w; }
+  for (let i = 0; i < 30 && a !== END; i++) { const list = temper(nextList(lm, a, k), T); if (!list.length) break; const w = sampleFrom(list); out.push(w); a = w; }
   return out;
 }
 $("#t2corpus").addEventListener("input", e => { T2.text = e.target.value; rebuildLM(); });
@@ -768,10 +796,11 @@ $("#t2gen").addEventListener("click", () => {
 $("#t2clearS").addEventListener("click", () => { clearInterval(T2.timer); T2.words = []; T2.digitsUsed = []; T2.view = START; T2.lastPick = null; $("#t2digitsOut").textContent = ""; renderT2(); });
 $("#t2gen20").addEventListener("click", () => {
   const lm = T2.lm, tally = new Map();
-  for (let i = 0; i < 20; i++) { const s = generateOne(lm, T2.T, T2.smooth).join(" "); tally.set(s, (tally.get(s) || 0) + 1); }
+  if (!lm.sents.length) { $("#t2genSum").textContent = "The corpus is empty: type a sentence first."; $("#t2list").innerHTML = ""; return; }
+  for (let i = 0; i < 50; i++) { const s = generateOne(lm, T2.T, T2.smooth).join(" "); tally.set(s, (tally.get(s) || 0) + 1); }
   const rows = [...tally.entries()].sort((a, b) => b[1] - a[1]);
   const fresh = rows.filter(([s]) => !lm.corpusSet.has(s)).reduce((t, r) => t + r[1], 0);
-  $("#t2genSum").textContent = `${rows.length} different · ${fresh} of 20 not in the corpus`;
+  $("#t2genSum").textContent = `${rows.length} different · ${fresh} of 50 not in the corpus`;
   $("#t2list").innerHTML = rows.map(([s, c]) => {
     if (!s.endsWith(" " + END) && s !== END) return `<div><span class="cnt">${c}×</span><span class="s">${esc(s)} …</span><span class="badge gray">cut after 30 words</span></div>`;
     const p = scoreSentence(lm, s.split(" ").slice(0, -1), T2.smooth).p;
@@ -887,7 +916,7 @@ function drawGraph() {
 }
 
 /* ============================================================ TAB 3: Naive Bayes */
-// Data sets from Jurafsky & Martin, Speech and Language Processing (3rd ed. draft), Appendix B.
+// Data sets from reference [1] (References tab): Section B.3 and Exercise B.2.
 const NB_SETS = {
   sent: { train: ["neg | just plain boring", "neg | entirely predictable and lacks energy", "neg | no surprises and very few laughs",
     "pos | very powerful", "pos | the most fun film of the summer"].join("\n"), test: "predictable with no fun",
@@ -898,7 +927,7 @@ const NB_SETS = {
     chips: [["Exercise B.2: D", "fast, couple, shoot, fly"], ["love, fun", "love, fun"], ["shoot", "shoot"]] },
 };
 const NB_ALPHAS = [0, 0.5, 1, 2, 5];
-const nbTokens = str => str.toLowerCase().match(/[a-z']+/g) || [];
+const nbTokens = str => (str.toLowerCase().replace(/[\u2018\u2019]/g, "'").match(/[a-z']+/g) || []).map(w => w.replace(/^'+|'+$/g, "")).filter(Boolean);
 function nbTrain(text) {
   const docs = [];
   for (const line of text.split("\n")) {
@@ -950,6 +979,8 @@ function renderT3() {
   $("#t3alphaV").textContent = T3.alpha === 0 ? "0 (off)" : T3.alpha === 1 ? "1 (add-one, as in the textbook)" : String(T3.alpha);
   if (m.classes.length !== 2) {
     $("#t3stats").innerHTML = `<span class="badge red">!</span> The training data needs exactly two classes; it has ${m.classes.length}.`;
+    for (const id of ["t3tokens", "t3calc", "t3table", "t3ev", "t3chal"]) $("#" + id).innerHTML = "";
+    $("#t3post").textContent = "—"; $("#t3verdict").textContent = ""; $("#t3needle").style.left = "50%";
     return;
   }
   const st = T3, r = nbRun(m, T3.text, st), { c1, c2 } = r;
@@ -995,7 +1026,8 @@ function renderT3() {
   const box = $("#t3chal");
   if (T3.set !== "sent") box.innerHTML = `<div class="sub">The challenges use the movie-review data set.</div>`;
   else {
-    for (const c of NB_CHALLENGES) if (!st.solved[c.id] && T3.text.trim() && c.test(r, st, m)) st.solved[c.id] = T3.text.trim();
+    const chalKey = [T3.text, T3.train, T3.alpha, T3.prior2].join("\u0001"); // after "Clear", wait for a change before solving again
+    if (T3.holdChal !== chalKey) { T3.holdChal = null; for (const c of NB_CHALLENGES) if (!st.solved[c.id] && T3.text.trim() && c.test(r, st, m)) st.solved[c.id] = T3.text.trim(); }
     box.innerHTML = NB_CHALLENGES.map((c, i) => `<div class="chal${st.solved[c.id] ? " done" : ""}"><div class="st">${st.solved[c.id] ? "✓" : i + 1}</div><div><b>${c.title}.</b> ${c.text}${st.solved[c.id] ? `<span class="by">solved by: “${esc(st.solved[c.id].slice(0, 90))}”</span>` : ""}</div></div>`).join("");
   }
 }
@@ -1021,7 +1053,7 @@ function drawEvidence(r) {
   });
 }
 function loadNBSet(key) {
-  T3.set = key; T3.train = NB_SETS[key].train; T3.text = NB_SETS[key].test; T3.prior2 = null;
+  T3.set = key; T3.train = NB_SETS[key].train; T3.text = NB_SETS[key].test; T3.prior2 = null; T3.alpha = 1; $("#t3alpha").value = 2;
   $("#t3train").value = T3.train; $("#t3msg").value = T3.text;
   $$("#t3data button").forEach(b => b.classList.toggle("active", b.dataset.d === key));
   const chips = $("#t3chips"); chips.innerHTML = "";
@@ -1035,7 +1067,7 @@ $("#t3msg").addEventListener("input", e => { T3.text = e.target.value; renderT3(
 $("#t3alpha").addEventListener("input", e => { T3.alpha = NB_ALPHAS[+e.target.value]; renderT3(); });
 $("#t3prior").addEventListener("input", e => { T3.prior2 = +e.target.value / 100; renderT3(); });
 $("#t3priorReset").addEventListener("click", () => { T3.prior2 = null; renderT3(); });
-$("#t3chalReset").addEventListener("click", () => { T3.solved = {}; renderT3(); });
+$("#t3chalReset").addEventListener("click", () => { T3.solved = {}; T3.holdChal = [T3.text, T3.train, T3.alpha, T3.prior2].join("\u0001"); renderT3(); });
 
 /* ============================================================ self-test (open with ?selftest) */
 function selftest() {
@@ -1072,6 +1104,7 @@ function selftest() {
   ok("3.2 Score(neg)", Math.exp(rT.l1), 6.106e-5, 5e-8); ok("3.2 Score(pos)", Math.exp(rT.l2), 3.280e-5, 5e-8); ok("3.2 P(pos | review)", rT.post, 0.3495);
   ok("3.3 without +1: 0/0", nbRun(mS, NB_SETS.sent.test, { alpha: 0, prior2: null }).post, null);
   ok("3.5 not boring at all", nbRun(mS, "not boring at all", one).post, 0.2810); ok("3.5 the film was not fun", nbRun(mS, "the film was not fun", one).post, 0.9280);
+  ok("3.5 not predictable at all", nbRun(mS, "not predictable at all", one).post, 0.2805);
   ok("flip with powerful", nbRun(mS, "predictable with no fun powerful", one).post, 0.5574); ok("prior only", nbRun(mS, "what a wonderful day", one).post, 0.4);
   ok("3.4 P(action | D)", nbRun(nbTrain(NB_SETS.genre.train), NB_SETS.genre.test, one).post, 0.7007);
   const box = $("#selftest"); box.style.display = "block";
@@ -1084,7 +1117,7 @@ $("#t2corpus").value = DEFAULT_CORPUS;
 setupT1Controls(); renderT1();
 rebuildLM(); runScore();
 loadNBSet("sent");
-const hashTab = (location.hash.match(/tab([123])/) || [])[1];
+const hashTab = (location.hash.match(/tab([1-4])/) || [])[1];
 if (hashTab) showTab(+hashTab);
 if (/selftest/.test(location.search + location.hash)) selftest();
 </script>
