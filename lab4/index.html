@@ -204,7 +204,7 @@ a.cite:hover{text-decoration:underline}
       </div>
       <div class="card">
         <h3>Your ID digits (task 2.2)</h3>
-        <p class="lead" style="margin-bottom:6px">Type the last two digits of your ID: the first gives the <b>row</b>, the second the <b>column</b> of the random-digit table. The digits are read to the right from there; a word with only one next word uses no digit.</p>
+        <p class="lead" style="margin-bottom:6px">Type the last two digits of your ID: the first gives the <b>row</b>, the second the <b>column</b> of the random-digit table. That cell is the first digit; then read to the right, continuing on the next row (after row 9, row 0). A word with only one next word uses no digit.</p>
         <div class="row wrap-sm" style="flex-wrap:nowrap"><input type="text" id="t2digits" class="mono" placeholder="e.g. 06" inputmode="numeric"><button class="btn primary" id="t2digitsGo">Generate</button></div>
         <div class="sub" id="t2digitsOut"></div>
         <div id="t2digitGrid" style="margin-top:8px"></div>
@@ -271,21 +271,21 @@ a.cite:hover{text-decoration:underline}
         <details id="t3jointBox"><summary>Show the answers to 3.1</summary><div id="t3joint" style="margin-top:8px"></div></details>
       </div>
       <div class="card">
-        <h3>Likelihoods P(word | class)</h3>
+        <h3 id="t3likLab">Likelihoods P(word | class)</h3>
         <div class="scroll" id="t3table"></div>
         <div class="sub" style="margin-top:6px" id="t3likNote">P(w | C) = (count + k) ÷ (words in class C + k·|V|). Words of the current review are highlighted.</div>
       </div>
     </div>
     <div class="stack">
       <div class="card">
-        <h3>Review to classify</h3>
+        <h3 id="t3msgLab">Review to classify</h3>
         <textarea id="t3msg" class="msgbox" rows="2" spellcheck="false"></textarea>
         <div class="chips" id="t3chips"></div>
         <div class="tokens" id="t3tokens"></div>
       </div>
       <div class="two">
         <div class="card">
-          <h3>Evidence: each word multiplies the odds</h3>
+          <h3 id="t3evLab">Evidence: each word multiplies the odds</h3>
           <svg id="t3ev" viewBox="0 0 640 300" aria-label="Evidence chart"></svg>
           <div class="calc" id="t3calc"></div>
         </div>
@@ -698,7 +698,7 @@ function digitRanges(lm, a) {
 // 2.2: the last two ID digits give a row and a column of this table (the same digits as in the handout).
 const DIGIT_TABLE = "2772656818117403534322355636784621209629232037629809398495858576014643687942095204109348939557017381";
 function idStream(str) {
-  const d = String(str).replace(/\D/g, "");
+  const d = String(str).replace(/[\u0660-\u0669\u06F0-\u06F9]/g, c => String(c.charCodeAt(0) & 15)).replace(/\D/g, ""); // Arabic and Persian digits too
   if (d.length < 2) return null;
   const start = +d.slice(-2);
   return { start, stream: Array.from({ length: 12 }, (_, k) => +DIGIT_TABLE[(start + k) % 100]) };
@@ -712,10 +712,11 @@ function generateWithDigits(lm, digits) {
     if (list.length === 1) { steps.push({ w: list[0][0], d: null }); a = list[0][0]; continue; }
     const rg = digitRanges(lm, a);
     if (!rg) return { error: `The digit game needs counts of 1, 2, 5 or 10 after each word; “${a}” has ${lm.totals.get(a)}.` };
-    if (!stream.length) return { error: "Not enough digits: add a few more.", steps };
+    if (!stream.length) return { error: `The ${digits.length} digits ran out before “.”: this corpus loops. Try another ID ending.`, steps };
     const d = stream.shift(), hit = rg.find(r => d >= r[1] && d <= r[2]);
     steps.push({ w: hit[0], d }); a = hit[0];
   }
+  if (a !== END) return { error: "Stopped after 40 words without reaching “.”.", steps };
   return { steps };
 }
 function scoreSentence(lm, tokens, k) {
@@ -784,7 +785,7 @@ function renderT2() {
     bars.append(row);
   }
   if (list.length > 12) bars.append(h("div", { class: "sub" }, `+ ${list.length - 12} more words with tiny probabilities (smoothing).`));
-  if (shown.length && Math.abs(Tv - 1) >= 0.005) bars.append(h("div", { class: "sub" }, "Bars: qᵢ, the probability used for sampling at this T. Orange tick: the model's own pᵢ (T = 1)."));
+  if (shown.length && Math.abs(Tv - 1) >= 0.005) bars.append(h("div", { class: "sub", html: "Bars: <i>q<sub>k</sub></i>, the probability used for sampling at this T. Orange tick: the model's own <i>p<sub>k</sub></i> (T = 1)." }));
   $("#t2step").disabled = done; $("#t2gen").disabled = done;
   drawGraph();
 }
@@ -812,7 +813,7 @@ $("#t2gen").addEventListener("click", () => {
   clearInterval(T2.timer);
   T2.timer = setInterval(() => { if (curWord() === END) { clearInterval(T2.timer); return; } t2Step(); }, 480);
 });
-$("#t2clearS").addEventListener("click", () => { clearInterval(T2.timer); T2.words = []; T2.digitsUsed = []; T2.view = START; T2.lastPick = null; $("#t2digitsOut").textContent = ""; renderT2(); });
+$("#t2clearS").addEventListener("click", () => { clearInterval(T2.timer); T2.words = []; T2.digitsUsed = []; T2.view = START; T2.lastPick = null; $("#t2digitsOut").textContent = ""; renderDigitGrid(null, 0); renderT2(); });
 $("#t2gen20").addEventListener("click", () => {
   const lm = T2.lm, tally = new Map();
   if (!lm.sents.length) { $("#t2genSum").textContent = "The corpus is empty: type a sentence first."; $("#t2list").innerHTML = ""; return; }
@@ -1022,10 +1023,15 @@ function renderT3() {
   if (m.classes.length !== 2) {
     $("#t3stats").innerHTML = `<span class="badge red">!</span> The training data needs exactly two classes; it has ${m.classes.length}.`;
     for (const id of ["t3tokens", "t3calc", "t3table", "t3ev", "t3chal"]) $("#" + id).innerHTML = "";
+    $("#t3jointCard").hidden = true;
     $("#t3post").textContent = "—"; $("#t3verdict").textContent = ""; $("#t3needle").style.left = "50%";
     return;
   }
   const st = T3, r = nbRun(m, T3.text, st), { c1, c2 } = r;
+  const given = m.perItem ? (r.known.join(", ") || "no known feature") : "review";
+  $("#t3msgLab").textContent = m.perItem ? "Shape to classify (colour and/or shape)" : "Review to classify";
+  $("#t3likLab").textContent = m.perItem ? "Likelihoods P(feature | class)" : "Likelihoods P(word | class)";
+  $("#t3evLab").textContent = m.perItem ? "Evidence: each feature multiplies the odds" : "Evidence: each word multiplies the odds";
   $("#t3stats").textContent = m.perItem ? `${m.docs.length} shapes · ${c1}: ${m.nDocs[c1]} · ${c2}: ${m.nDocs[c2]} · P(feature | class) = fraction of the class's shapes, as on slide 60 (no smoothing)`
     : `${m.docs.length} reviews · ${c1}: ${m.nDocs[c1]} (${m.totals[c1]} words) · ${c2}: ${m.nDocs[c2]} (${m.totals[c2]} words) · |V| = ${m.vocab.size}`;
   $("#t3alpha").disabled = m.perItem;
@@ -1036,7 +1042,7 @@ function renderT3() {
   $("#t3priorLab").textContent = `Prior P(${c2})` + (T3.prior2 == null ? " (from the data)" : "");
   $("#t3priorV").textContent = r.p2.toFixed(2);
   $("#t3prior").value = Math.round(r.p2 * 100);
-  $("#t3postLab").textContent = `P(${c2} | review)`;
+  $("#t3postLab").textContent = `P(${c2} | ${given})`;
   $("#t3endL").textContent = c1; $("#t3endR").textContent = c2;
   // tokens: known words coloured by the class they favour, unknown words dropped
   const tk = $("#t3tokens"); tk.innerHTML = "";
@@ -1053,7 +1059,7 @@ function renderT3() {
   $("#t3calc").innerHTML =
     `<b>Score(${esc(c1)})</b> = ${line("f1", fmt(1 - r.p2, 3))} = <b>${fmt(S1, 3)}</b><br>` +
     `<b>Score(${esc(c2)})</b> = ${line("f2", fmt(r.p2, 3))} = <b>${fmt(S2, 3)}</b><br>` +
-    (r.post === null ? `<b>P(${esc(c2)} | review)</b> = 0 / 0: the model cannot decide` : `<b>P(${esc(c2)} | review)</b> = ${fmt(S2, 3)} / (${fmt(S1, 3)} + ${fmt(S2, 3)}) = <b>${fmt(r.post, 3)}</b>`) +
+    (r.post === null ? `<b>P(${esc(c2)} | ${esc(given)})</b> = 0 / 0: the model cannot decide` : `<b>P(${esc(c2)} | ${esc(given)})</b> = ${fmt(S2, 3)} / (${fmt(S1, 3)} + ${fmt(S2, 3)}) = <b>${fmt(r.post, 3)}</b>, so P(${esc(c1)} | ${esc(given)}) = <b>${fmt(1 - r.post, 3)}</b>`) +
     (r.toks.length > r.known.length ? `<br><span class="sub">Dropped (unknown): ${esc([...new Set(r.toks.filter(t => !m.vocab.has(t)))].join(", "))}</span>` : "");
   $("#t3post").textContent = r.post === null ? "0/0" : fmt(r.post, 3);
   const v = $("#t3verdict");
@@ -1092,7 +1098,7 @@ function renderJoint(m) {
   const c0 = colours[0], rA = cnt(c0, A), rB = cnt(c0, B);
   html += `<div class="calc" style="margin-top:8px">P(${esc(c0)} | ${esc(A)}) = ${frac(rA, n)} ÷ ${frac(m.nDocs[A], n)} = <b>${frac(rA, m.nDocs[A])}</b>` +
     `<br>P(${esc(c0)} | ${esc(B)}) = ${frac(rB, n)} ÷ ${frac(m.nDocs[B], n)} = <b>${frac(rB, m.nDocs[B])}</b>` +
-    `<br>P(${esc(c0)}) = ${frac(rA, m.nDocs[A])} · ${frac(m.nDocs[A], n)} + ${frac(rB, m.nDocs[B])} · ${frac(m.nDocs[B], n)} = <b>${frac(rA + rB, n)}</b> (total probability)` +
+    `<br>P(${esc(c0)}) = ${frac(rA, m.nDocs[A])} · ${frac(m.nDocs[A], n)} + ${frac(rB, m.nDocs[B])} · ${frac(m.nDocs[B], n)} = <b>${frac(rA + rB, n)}</b> (as on slide 40)` +
     `<br>Bayes: P(${esc(B)} | ${esc(c0)}) = ${frac(rB, m.nDocs[B])} · ${frac(m.nDocs[B], n)} ÷ ${frac(rA + rB, n)} = <b>${frac(rB, rA + rB)}</b>, but P(${esc(c0)} | ${esc(B)}) = ${frac(rB, m.nDocs[B])}</div>`;
   $("#t3joint").innerHTML = html;
 }
@@ -1172,7 +1178,7 @@ function selftest() {
   ok("3.3 Score(neg)", Math.exp(rT.l1), 6.106e-5, 5e-8); ok("3.3 Score(pos)", Math.exp(rT.l2), 3.280e-5, 5e-8); ok("3.3 P(pos | review)", rT.post, 0.3495);
   ok("3.4 without +1: 0/0", nbRun(mS, NB_SETS.sent.test, { alpha: 0, prior2: null }).post, null);
   ok("3.5 not boring at all", nbRun(mS, "not boring at all", one).post, 0.2810); ok("3.5 the film was not fun", nbRun(mS, "the film was not fun", one).post, 0.9280);
-  ok("3.5 not predictable at all", nbRun(mS, "not predictable at all", one).post, 0.2805);
+  ok("3.5 not predictable at all", nbRun(mS, "not predictable at all", one).post, 0.2810);
   ok("flip with powerful", nbRun(mS, "predictable with no fun powerful", one).post, 0.5574); ok("prior only", nbRun(mS, "what a wonderful day", one).post, 0.4);
   ok("Extra P(action | D)", nbRun(nbTrain(NB_SETS.genre.train), NB_SETS.genre.test, one).post, 0.7007);
   const mSh = nbTrain(NB_SETS.shapes.train, true), zero = { alpha: 0, prior2: null };
