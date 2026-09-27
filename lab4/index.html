@@ -71,11 +71,6 @@ table.t th{background:var(--paleteal);color:var(--brand)}
 table.t td.l,table.t th.l{text-align:left}
 table.t td.w{font-family:Menlo,Consolas,monospace;font-weight:700;color:var(--brand)}
 table.t input{width:64px;padding:3px 5px;text-align:center}
-table.dg{border-collapse:collapse;font-family:Menlo,Consolas,monospace;font-size:.85rem}
-table.dg td,table.dg th{width:1.7em;height:1.5em;text-align:center;border:1px solid #E3E9EE;padding:0}
-table.dg th{background:var(--paleteal);color:var(--brand)}
-table.dg td.used{background:var(--orange);color:#fff;font-weight:700}
-table.dg td.start{outline:2px solid var(--brand);outline-offset:-2px}
 details{margin-top:10px}
 details summary{cursor:pointer;color:var(--brand);font-weight:700;font-size:.92rem}
 .bars{display:flex;flex-direction:column;gap:7px;margin:8px 0}
@@ -91,7 +86,6 @@ details summary{cursor:pointer;color:var(--brand);font-weight:700;font-size:.92r
 .sentence .tok{background:var(--paleblue);border:1px solid #CFDDE7;border-radius:6px;padding:2px 8px}
 .sentence .tok.start{background:#E1ECF3;font-family:inherit;font-weight:700;font-size:.9rem}
 .sentence .arr{color:var(--line);font-size:.9rem}
-.sentence .dg{color:var(--orange);font-size:.78rem;font-weight:700}
 .list{font-size:.9rem;max-height:280px;overflow:auto}
 .list div{display:flex;gap:10px;padding:4px 0;border-bottom:1px dashed #E3E9EE;align-items:baseline}
 .list .cnt{width:34px;text-align:right;font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums}
@@ -200,14 +194,12 @@ a.cite:hover{text-decoration:underline}
         <h3>Training corpus (one sentence per line)</h3>
         <textarea id="t2corpus" class="mono" rows="10" spellcheck="false"></textarea>
         <div class="row"><button class="btn" id="t2reset">Reset to the handout corpus</button><span class="sub" id="t2stats"></span></div>
-        <details id="t2tableBox"><summary>Counts, probabilities and digits (task 2.1)</summary><div id="t2table" style="margin-top:8px"></div></details>
+        <details id="t2tableBox"><summary>Counts and probabilities (task 2.1)</summary><div id="t2table" style="margin-top:8px"></div></details>
       </div>
       <div class="card">
-        <h3>Your ID digits (task 2.2)</h3>
-        <p class="lead" style="margin-bottom:6px">Type the last two digits of your ID: the first gives the <b>row</b>, the second the <b>column</b> of the random-digit table. That cell is the first digit; then read to the right, continuing on the next row (after row 9, row 0). A word with only one next word uses no digit.</p>
-        <div class="row wrap-sm" style="flex-wrap:nowrap"><input type="text" id="t2digits" class="mono" placeholder="e.g. 06" inputmode="numeric"><button class="btn primary" id="t2digitsGo">Generate</button></div>
-        <div class="sub" id="t2digitsOut"></div>
-        <div id="t2digitGrid" style="margin-top:8px"></div>
+        <h3>Sentences from the handout</h3>
+        <p class="lead" style="margin-bottom:6px">Click a sentence: its path lights up in the chain, and the page multiplies the probabilities along it.</p>
+        <div class="chips" id="t2sentChips"></div>
       </div>
     </div>
     <div class="stack">
@@ -690,35 +682,6 @@ function temper(list, T) {
   return list.map((o, i) => ({ ...o, q: ws[i] / z }));
 }
 function sampleFrom(list) { let r = Math.random(), acc = 0; for (const o of list) { acc += o.q; if (r < acc) return o.w; } return list[list.length - 1].w; }
-function digitRanges(lm, a) {
-  const list = lm.order.get(a) || [], n = lm.totals.get(a) || 0;
-  if (!n || 10 % n) return null;
-  let s = 0; return list.map(([w, c]) => { const size = 10 * c / n, r = [w, s, s + size - 1]; s += size; return r; });
-}
-// 2.2: the last two ID digits give a row and a column of this table (the same digits as in the handout).
-const DIGIT_TABLE = "2772656818117403534322355636784621209629232037629809398495858576014643687942095204109348939557017381";
-function idStream(str) {
-  const d = String(str).replace(/[\u0660-\u0669\u06F0-\u06F9]/g, c => String(c.charCodeAt(0) & 15)).replace(/\D/g, ""); // Arabic and Persian digits too
-  if (d.length < 2) return null;
-  const start = +d.slice(-2);
-  return { start, stream: Array.from({ length: 12 }, (_, k) => +DIGIT_TABLE[(start + k) % 100]) };
-}
-function generateWithDigits(lm, digits) {
-  const stream = [...digits];
-  const steps = []; let a = START, guard = 0;
-  while (a !== END && guard++ < 40) {
-    const list = lm.order.get(a);
-    if (!list) return { error: `“${a}” is never followed by anything.` };
-    if (list.length === 1) { steps.push({ w: list[0][0], d: null }); a = list[0][0]; continue; }
-    const rg = digitRanges(lm, a);
-    if (!rg) return { error: `The digit game needs counts of 1, 2, 5 or 10 after each word; “${a}” has ${lm.totals.get(a)}.` };
-    if (!stream.length) return { error: `The ${digits.length} digits ran out before “.”: this corpus loops. Try another ID ending.`, steps };
-    const d = stream.shift(), hit = rg.find(r => d >= r[1] && d <= r[2]);
-    steps.push({ w: hit[0], d }); a = hit[0];
-  }
-  if (a !== END) return { error: "Stopped after 40 words without reaching “.”.", steps };
-  return { steps };
-}
 function scoreSentence(lm, tokens, k) {
   const seq = [START, ...tokens];
   if (seq[seq.length - 1] !== END) seq.push(END);
@@ -730,27 +693,26 @@ function scoreSentence(lm, tokens, k) {
   return { factors, p, seq };
 }
 
-const T2 = { text: DEFAULT_CORPUS, lm: null, T: 1, smooth: 0, words: [], digitsUsed: [], view: START, lastPick: null, timer: 0 };
+const T2 = { text: DEFAULT_CORPUS, lm: null, T: 1, smooth: 0, words: [], view: START, lastPick: null, timer: 0 };
 function curWord() { return T2.words.length ? T2.words[T2.words.length - 1] : START; }
 function rebuildLM() {
-  clearInterval(T2.timer); T2.lm = buildLM(T2.text); T2.words = []; T2.digitsUsed = []; T2.view = START; T2.lastPick = null;
+  clearInterval(T2.timer); T2.lm = buildLM(T2.text); T2.words = []; T2.view = START; T2.lastPick = null;
   const lm = T2.lm;
   $("#t2stats").textContent = `${lm.sents.length} sentences · ${lm.vocab.length - (lm.vocab.includes(END) ? 1 : 0)} words + “.”`;
-  $("#t2list").innerHTML = ""; $("#t2genSum").textContent = ""; $("#t2digitsOut").textContent = ""; renderDigitGrid(null, 0);
+  $("#t2list").innerHTML = ""; $("#t2genSum").textContent = "";
   renderT2Table(); renderT2(); runScore();
 }
 function renderT2Table() {
   const lm = T2.lm, rows = [];
   const ctxs = [START, ...[...lm.order.keys()].filter(a => a !== START)];
   for (const a of ctxs) {
-    const list = lm.order.get(a), n = lm.totals.get(a), rg = digitRanges(lm, a);
+    const list = lm.order.get(a), n = lm.totals.get(a);
     if (!list) continue;
     list.forEach(([w, c], i) => {
-      const r = rg && list.length > 1 ? rg[i] : null;
-      rows.push(`<tr>${i === 0 ? `<td class="w l" rowspan="${list.length}">${esc(a)}</td>` : ""}<td class="w l">${esc(w)}</td><td>${c}/${n}</td><td>${fmt(c / n, 3)}</td><td>${r ? (r[1] === r[2] ? r[1] : r[1] + "–" + r[2]) : list.length === 1 ? "—" : "n/a"}</td></tr>`);
+      rows.push(`<tr>${i === 0 ? `<td class="w l" rowspan="${list.length}">${esc(a)}</td>` : ""}<td class="w l">${esc(w)}</td><td>${c}/${n}</td><td>${fmt(c / n, 3)}</td></tr>`);
     });
   }
-  $("#t2table").innerHTML = `<table class="t"><tr><th class="l">Word</th><th class="l">Next</th><th>Count</th><th>P</th><th>Digits</th></tr>${rows.join("")}</table>`;
+  $("#t2table").innerHTML = `<table class="t"><tr><th class="l">Word</th><th class="l">Next</th><th>Count</th><th>P</th></tr>${rows.join("")}</table>`;
 }
 function renderT2() {
   const lm = T2.lm, k = T2.smooth;
@@ -760,10 +722,8 @@ function renderT2() {
   // sentence
   const sEl = $("#t2sentence"); sEl.innerHTML = "";
   sEl.append(h("span", { class: "tok start" }, "START"));
-  T2.words.forEach((w, i) => {
-    const d = T2.digitsUsed[i];
+  T2.words.forEach(w => {
     sEl.append(h("span", { class: "arr" }, "→"));
-    if (d !== undefined && d !== null) sEl.append(h("span", { class: "dg" }, "[" + d + "]"));
     sEl.append(h("span", { class: "tok" }, w));
   });
   const done = curWord() === END;
@@ -794,7 +754,7 @@ function t2Step() {
   const list = temper(nextList(T2.lm, a, T2.smooth), T2.T);
   if (!list.length) { clearInterval(T2.timer); return; }
   const w = sampleFrom(list);
-  T2.pickCtx = a; T2.lastPick = w; T2.words.push(w); T2.digitsUsed.push(null); T2.view = a;
+  T2.pickCtx = a; T2.lastPick = w; T2.words.push(w); T2.view = a;
   renderT2();
   T2.view = w;
   clearTimeout(T2.viewTimer); T2.viewTimer = setTimeout(() => { if (curWord() === w) { T2.lastPick = null; renderT2(); } }, 650);
@@ -813,7 +773,7 @@ $("#t2gen").addEventListener("click", () => {
   clearInterval(T2.timer);
   T2.timer = setInterval(() => { if (curWord() === END) { clearInterval(T2.timer); return; } t2Step(); }, 480);
 });
-$("#t2clearS").addEventListener("click", () => { clearInterval(T2.timer); T2.words = []; T2.digitsUsed = []; T2.view = START; T2.lastPick = null; $("#t2digitsOut").textContent = ""; renderDigitGrid(null, 0); renderT2(); });
+$("#t2clearS").addEventListener("click", () => { clearInterval(T2.timer); T2.words = []; T2.view = START; T2.lastPick = null; renderT2(); });
 $("#t2gen20").addEventListener("click", () => {
   const lm = T2.lm, tally = new Map();
   if (!lm.sents.length) { $("#t2genSum").textContent = "The corpus is empty: type a sentence first."; $("#t2list").innerHTML = ""; return; }
@@ -827,37 +787,16 @@ $("#t2gen20").addEventListener("click", () => {
     return `<div><span class="cnt">${c}×</span><span class="s">${esc(s)}</span>${lm.corpusSet.has(s) ? "" : '<span class="badge orange">new</span>'}<span class="p">P = ${fmt(p, 2)}</span></div>`;
   }).join("");
 });
-$("#t2digitsGo").addEventListener("click", runDigits);
-$("#t2digits").addEventListener("keydown", e => { if (e.key === "Enter") runDigits(); });
-function renderDigitGrid(start, used) {
-  const box = $("#t2digitGrid"); if (!box) return;
-  let html = '<table class="dg"><tr><th></th>' + [...Array(10).keys()].map(c => `<th>${c}</th>`).join("") + "</tr>";
-  for (let r = 0; r < 10; r++) {
-    html += `<tr><th>${r}</th>`;
-    for (let c = 0; c < 10; c++) {
-      const i = 10 * r + c, k = (i - start + 100) % 100;
-      html += `<td class="${start != null && k < used ? "used" : ""}${i === start ? " start" : ""}">${DIGIT_TABLE[i]}</td>`;
-    }
-    html += "</tr>";
-  }
-  box.innerHTML = html + "</table>";
-}
-function runDigits() {
+// 2.2: the handout's three sentences; a click shows the path in the chain and its probability.
+const T2_SENTENCES = ["we love coffee .", "robots are fun .", "i love ai ."];
+function showSentence(text) {
   clearInterval(T2.timer);
-  const out = $("#t2digitsOut"), id = idStream($("#t2digits").value);
-  if (!id) { out.innerHTML = '<span class="badge red">!</span> Type at least the last two digits of your ID.'; renderDigitGrid(null, 0); return; }
-  const r = generateWithDigits(T2.lm, id.stream);
-  const nUsed = r.steps ? r.steps.filter(x => x.d !== null).length : 0;
-  renderDigitGrid(id.start, nUsed);
-  if (r.error && !r.steps) { out.innerHTML = `<span class="badge red">!</span> ${esc(r.error)}`; return; }
-  T2.words = r.steps.map(s => s.w); T2.digitsUsed = r.steps.map(s => s.d); T2.view = curWord(); T2.lastPick = null;
-  if (r.error) out.innerHTML = `<span class="badge red">!</span> ${esc(r.error)}`;
-  else {
-    const s = T2.words.join(" "), p = scoreSentence(T2.lm, T2.words.slice(0, -1), 0).p;
-    out.innerHTML = `Row ${Math.floor(id.start / 10)}, column ${id.start % 10}. Digits used: <b>${r.steps.filter(x => x.d !== null).map(x => x.d).join(", ") || "none"}</b> → <span class="mono">${esc(s)}</span> · P = <b>${fmt(p, 3)}</b> ${T2.lm.corpusSet.has(s) ? '<span class="badge gray">in corpus</span>' : '<span class="badge orange">new sentence!</span>'}`;
-  }
-  renderT2();
+  const toks = tokenizeText(text).filter(t => t !== END);
+  T2.words = [...toks, END]; T2.view = END; T2.lastPick = null;
+  $("#t2score").value = text; runScore(); renderT2();
 }
+for (const t of T2_SENTENCES) $("#t2sentChips").append(h("button", { class: "chip", onclick: () => showSentence(t) }, "2.2 " + t));
+$("#t2sentChips").append(h("button", { class: "chip", onclick: () => showSentence("ai is everywhere .") }, "2.3(a) ai is everywhere ."));
 function runScore() {
   const toks = tokenizeText($("#t2score").value).filter(t => t !== END);
   const r = scoreSentence(T2.lm, toks, T2.smooth);
@@ -1160,11 +1099,10 @@ function selftest() {
   const sv = JSON.parse(save); T1.uniform = sv.u; T1.triangle = sv.t; T1.normal = sv.n;
   const lm = buildLM(DEFAULT_CORPUS), P = (a, b) => (nextList(lm, a, 0).find(o => o.w === b) || { p: 0 }).p;
   ok("2.1 P(study|i)", P("i", "study"), 0.8); ok("2.1 P(ai|study)", P("study", "ai"), 0.6); ok("2.1 P(.|ai)", P("ai", "."), 0.6); ok("2.1 P(is|ai)", P("ai", "is"), 0.2);
-  ok("2.1 START digits", digitRanges(lm, START).map(r => r.join(":")).join(" "), "i:0:4 we:5:6 robots:7:8 ai:9:9");
-  ok("2.1 ai digits", digitRanges(lm, "ai").map(r => r.join(":")).join(" "), ".:0:5 at:6:7 is:8:9");
-  ok("2.2 ID ...06: row 0, column 6", generateWithDigits(lm, idStream("202645106").stream).steps.map(s => s.w).join(" "), "we love coffee .");
-  ok("2.2 ID ...67", generateWithDigits(lm, idStream("67").stream).steps.map(s => s.w).join(" "), "we study ai at mbzuai .");
-  ok("2.2 digit table matches the handout", DIGIT_TABLE.length === 100 && DIGIT_TABLE.slice(0, 10) === "2772656818" && DIGIT_TABLE.slice(90) === "9557017381", true);
+  ok("2.2 P(we love coffee .)", scoreSentence(lm, ["we", "love", "coffee"], 0).p, 0.05, 1e-12);
+  ok("2.2 P(robots are fun .)", scoreSentence(lm, ["robots", "are", "fun"], 0).p, 0.1, 1e-12);
+  ok("2.2 P(i love ai .)", scoreSentence(lm, ["i", "love", "ai"], 0).p, 0.03, 1e-12);
+  ok("2.2 new sentences", ["we love coffee .", "robots are fun .", "i love ai ."].map(x => lm.corpusSet.has(x)).join(), "false,true,false");
   ok("2.3 P(i study ai .)", scoreSentence(lm, ["i", "study", "ai"], 0).p, 0.144, 1e-9);
   ok("2.3 P(ai is everywhere .)", scoreSentence(lm, ["ai", "is", "everywhere"], 0).p, 0, 0);
   ok("2.3 P(i study ai is fun .)", scoreSentence(lm, "i study ai is fun".split(" "), 0).p, 0.048, 1e-9);
