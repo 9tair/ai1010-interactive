@@ -246,8 +246,8 @@ a.cite:hover{text-decoration:underline}
         <p class="lead">Shapes from <a class="cite" href="#tab4">[2]</a>, reviews from <a class="cite" href="#tab4">[1]</a>. Score(C) = P(C) × P(word₁ | C) × P(word₂ | C) × …, and P(C | review) = Score(C) ÷ (sum of all scores): Bayes' rule, with the sum of the scores as the denominator. Words that never occur in training are dropped.</p>
         <h3>Data set</h3>
         <div class="seg" id="t3data">
-          <button data-d="shapes">Shapes (slide 60, task 3.1)</button>
-          <button data-d="sent" class="active">Movie reviews (B.3)</button>
+          <button data-d="shapes" class="active">Shapes (slide 60, task 3.1)</button>
+          <button data-d="sent">Movie reviews (B.3)</button>
           <button data-d="genre">Comedy or action (Extra)</button>
         </div>
         <h3 id="t3trainLab">Training reviews (one per line: class | words)</h3>
@@ -262,11 +262,6 @@ a.cite:hover{text-decoration:underline}
         <h3>Task 3.1: the joint table (colour × class)</h3>
         <details id="t3jointBox"><summary>Show the answers to 3.1</summary><div id="t3joint" style="margin-top:8px"></div></details>
       </div>
-      <div class="card">
-        <h3 id="t3likLab">Likelihoods P(word | class)</h3>
-        <div class="scroll" id="t3table"></div>
-        <div class="sub" style="margin-top:6px" id="t3likNote">P(w | C) = (count + k) ÷ (words in class C + k·|V|). Words of the current review are highlighted.</div>
-      </div>
     </div>
     <div class="stack">
       <div class="card">
@@ -278,7 +273,7 @@ a.cite:hover{text-decoration:underline}
       <div class="two">
         <div class="card">
           <h3 id="t3evLab">Evidence: each word multiplies the odds</h3>
-          <svg id="t3ev" viewBox="0 0 640 300" aria-label="Evidence chart"></svg>
+          <svg id="t3ev" viewBox="0 0 460 300" aria-label="Evidence chart"></svg>
           <div class="calc" id="t3calc"></div>
         </div>
         <div class="card">
@@ -289,6 +284,11 @@ a.cite:hover{text-decoration:underline}
           <div id="t3chal"></div>
           <div class="row"><button class="btn" id="t3chalReset">Clear solved challenges</button></div>
         </div>
+      </div>
+      <div class="card">
+        <h3 id="t3likLab">Likelihoods P(word | class)</h3>
+        <div class="scroll" id="t3table"></div>
+        <div class="sub" style="margin-top:6px" id="t3likNote">P(w | C) = (count + k) ÷ (words in class C + k·|V|). Words of the current review are highlighted.</div>
       </div>
     </div>
   </div>
@@ -493,7 +493,7 @@ function setupT1Controls() {
 }
 function applyPreset(a, b) {
   const D = D1();
-  if (a === "sd2" || a === "sd4") { T1.normal.sd = a === "sd2" ? 2 : 4; T1.darts = []; setupT1Controls(); renderT1(); return; }
+  if (a === "sd2" || a === "sd4") { cancelAnimationFrame(T1.anim); T1.normal.sd = a === "sd2" ? 2 : 4; T1.darts = []; if (T1.hi - T1.lo < 1e-9) [T1.lo, T1.hi] = D.start; setupT1Controls(); renderT1(); return; }
   const [s0, s1] = D.support();
   T1.lo = a === "min" ? D.domain()[0] : a;
   T1.hi = b === "max" ? (T1.kind === "normal" ? D.domain()[1] : s1) : b;
@@ -551,8 +551,10 @@ function renderT1() {
       for (let i = 0; i <= 120; i++) { const x = mu - k * sd + 2 * k * sd * i / 120; band.push([x, D.pdf(x)]); }
       band.push([mu + k * sd, 0]);
       svgEl("path", { d: pathFrom(band) + "Z", fill: col }, svg);
-      svgText(svg, X(mu), Y(D.pdf(mu) * (k === 1 ? 0.45 : 0.12)), k === 1 ? "68%" : "95%", { "text-anchor": "middle", "font-size": 15, "font-weight": 700, fill: "#147D7B" });
     }
+    const bandLab = { "text-anchor": "middle", "font-size": 15, "font-weight": 700, fill: "#147D7B" }; // after both bands, so neither label is covered
+    svgText(svg, X(mu), Y(D.pdf(mu) * 0.45), "68%", bandLab);
+    svgText(svg, X(mu + 1.5 * sd), Y(D.pdf(mu + 1.5 * sd) * 0.3), "95%", bandLab);
   }
   // shaded interval
   if (T1.hi > T1.lo) {
@@ -589,7 +591,7 @@ function renderT1() {
   const p = probT1();
   if (T1.hi - T1.lo > (x1 - x0) * 0.06) {
     const mid = (T1.lo + T1.hi) / 2;
-    svgText(svg, X(mid), Y(Math.min(D.pdf(mid), ymax) * 0.45), fmt(p, 3), { "text-anchor": "middle", "font-size": 22, "font-weight": 800, fill: "#7A3A0E" });
+    svgText(svg, X(mid), Y(Math.min(D.pdf(mid), ymax) * (T1.kind === "normal" && T1.bands ? 0.75 : 0.45)), fmt(p, 3), { "text-anchor": "middle", "font-size": 22, "font-weight": 800, fill: "#7A3A0E" });
   }
   // readouts
   $("#t1plabel").textContent = intervalLabel();
@@ -856,7 +858,7 @@ function drawGraph() {
   const path = [START, ...T2.words], onPath = new Set();
   for (let i = 0; i + 1 < path.length; i++) onPath.add(path[i] + ">" + path[i + 1]);
   const edges = [];
-  for (const [a, list] of lm.order) for (const [b, c] of list) edges.push({ a, b, p: c / lm.totals.get(a), key: a + ">" + b });
+  for (const [a, list] of lm.order) { const pk = new Map(nextList(lm, a, T2.smooth).map(o => [o.w, o.p])); for (const [b] of list) edges.push({ a, b, p: pk.get(b), key: a + ">" + b }); }
   edges.sort((e1, e2) => onPath.has(e1.key) - onPath.has(e2.key));
   for (const e of edges) {
     const A = boxOf(e.a, pos), B = boxOf(e.b, pos), hot = onPath.has(e.key);
@@ -896,7 +898,7 @@ function drawGraph() {
     g.addEventListener("click", () => { if (n !== END) { T2.view = n; T2.lastPick = null; renderT2(); } });
   }
   $("#t2graphNote").textContent = (handout ? "The same chain as in the handout. " : "Your corpus, laid out by distance from START. ") +
-    "Click a word to see what can follow it." + (T2.smooth ? " Smoothing gives every missing arrow a small probability (not drawn)." : "");
+    "Click a word to see what can follow it." + (T2.smooth ? " With smoothing, every drawn arrow gives some probability to the missing arrows (not drawn)." : "");
 }
 
 /* ============================================================ TAB 3: Naive Bayes */
@@ -907,7 +909,7 @@ const NB_SETS = {
     chips: [["red (3.1c)", "red"], ["red square (3.1d)", "red square"], ["blue", "blue"], ["blue triangle", "blue triangle"]] },
   sent: { train: ["neg | just plain boring", "neg | entirely predictable and lacks energy", "neg | no surprises and very few laughs",
     "pos | very powerful", "pos | the most fun film of the summer"].join("\n"), test: "predictable with no fun",
-    chips: [["Textbook test review", "predictable with no fun"], ["not boring at all", "not boring at all"], ["the film was not fun", "the film was not fun"],
+    chips: [["Textbook test review", "predictable with no fun"], ["not boring at all", "not boring at all"],
       ["very powerful", "very powerful"], ["No known words", "what a wonderful day"]] },
   genre: { train: ["comedy | fun, couple, love, love", "action | fast, furious, shoot", "comedy | couple, fly, fast, fun, fun",
     "action | furious, shoot, shoot, fun", "action | fly, fast, shoot, love"].join("\n"), test: "fast, couple, shoot, fly",
@@ -1051,11 +1053,11 @@ function renderJoint(m) {
   $("#t3joint").innerHTML = html;
 }
 function drawEvidence(r) {
-  const svg = $("#t3ev"), W = 640, rowH = 30, rows = r.items.map(it => ({ label: it.kind === "prior" ? "prior odds" : it.label, f: it.f2 / it.f1, kind: it.kind }));
+  const svg = $("#t3ev"), W = 460, rowH = 30, rows = r.items.map(it => ({ label: it.kind === "prior" ? "prior odds" : it.label, f: it.f2 / it.f1, kind: it.kind }));
   rows.push({ label: "total odds", f: Math.exp(r.l2 - r.l1), kind: "total" });
   const Hh = Math.max(150, 40 + rows.length * rowH + 20);
   svg.setAttribute("viewBox", `0 0 ${W} ${Hh}`); svg.innerHTML = "";
-  const cx = 360, unit = 62, maxDec = 4.2;
+  const cx = 290, unit = 40, maxDec = 3.4;
   svgText(svg, cx - 12, 18, "← " + r.c1, { "text-anchor": "end", "font-size": 13, fill: "#147D7B", "font-weight": 700 });
   svgText(svg, cx + 12, 18, r.c2 + " →", { "font-size": 13, fill: "#B65C1A", "font-weight": 700 });
   for (let d = -4; d <= 4; d++) { const x = cx + d * unit; if (x < 150 || x > W - 10) continue; svgEl("line", { x1: x, x2: x, y1: 26, y2: Hh - 8, stroke: d === 0 ? "#53616C" : "#E6ECF0", "stroke-width": d === 0 ? 1.4 : 1 }, svg); }
@@ -1068,7 +1070,8 @@ function drawEvidence(r) {
     const x0 = dec >= 0 ? cx : cx + dec * unit, wBar = Math.max(2, Math.abs(dec) * unit);
     svgEl("rect", { x: x0, y: y + 3, width: wBar, height: rowH - 9, rx: 4, fill: col, opacity: 0.85 }, svg);
     const label = nan ? "0/0" : row.f === 0 ? "×0 (veto)" : row.f === Infinity ? "×∞" : "×" + fmt(row.f, 3);
-    svgText(svg, dec >= 0 ? x0 + wBar + 6 : x0 - 6, y + 16, label, { "text-anchor": dec >= 0 ? "start" : "end", "font-size": 13, fill: col, "font-weight": 700 });
+    const out = Math.abs(dec) >= maxDec - 1e-9; // clamped bar: put its label on the other side of the axis
+    svgText(svg, out ? (dec >= 0 ? cx - 6 : cx + 6) : dec >= 0 ? x0 + wBar + 6 : x0 - 6, y + 16, label, { "text-anchor": (dec >= 0) !== out ? "start" : "end", "font-size": 13, fill: col, "font-weight": 700 });
   });
 }
 function loadNBSet(key) {
@@ -1141,7 +1144,7 @@ function selftest() {
 $("#t2corpus").value = DEFAULT_CORPUS;
 setupT1Controls(); renderT1();
 rebuildLM(); runScore();
-loadNBSet("sent");
+loadNBSet("shapes");
 const hashTab = (location.hash.match(/tab([1-4])/) || [])[1];
 if (hashTab) showTab(+hashTab);
 if (/selftest/.test(location.search + location.hash)) selftest();
