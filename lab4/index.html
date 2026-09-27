@@ -71,6 +71,11 @@ table.t th{background:var(--paleteal);color:var(--brand)}
 table.t td.l,table.t th.l{text-align:left}
 table.t td.w{font-family:Menlo,Consolas,monospace;font-weight:700;color:var(--brand)}
 table.t input{width:64px;padding:3px 5px;text-align:center}
+table.dg{border-collapse:collapse;font-family:Menlo,Consolas,monospace;font-size:.85rem}
+table.dg td,table.dg th{width:1.7em;height:1.5em;text-align:center;border:1px solid #E3E9EE;padding:0}
+table.dg th{background:var(--paleteal);color:var(--brand)}
+table.dg td.used{background:var(--orange);color:#fff;font-weight:700}
+table.dg td.start{outline:2px solid var(--brand);outline-offset:-2px}
 details{margin-top:10px}
 details summary{cursor:pointer;color:var(--brand);font-weight:700;font-size:.92rem}
 .bars{display:flex;flex-direction:column;gap:7px;margin:8px 0}
@@ -164,7 +169,7 @@ a.cite:hover{text-decoration:underline}
           <button class="btn primary" id="t1darts">Throw 1000 darts</button>
           <button class="btn" id="t1clear">Clear darts</button>
         </div>
-        <label class="check" id="t1bandsRow"><input type="checkbox" id="t1bands"> Show the 68–95 bands (μ ± σ, μ ± 2σ)</label>
+        <label class="check" id="t1bandsRow"><input type="checkbox" id="t1bands"> Show where 68% and 95% of the area lie</label>
       </div>
       <div class="card">
         <h3>Try in class</h3>
@@ -199,9 +204,10 @@ a.cite:hover{text-decoration:underline}
       </div>
       <div class="card">
         <h3>Your ID digits (task 2.2)</h3>
-        <p class="lead" style="margin-bottom:6px">Start with the <b>last</b> digit and move left; a word with only one next word uses no digit.</p>
-        <div class="row wrap-sm" style="flex-wrap:nowrap"><input type="text" id="t2digits" class="mono" placeholder="e.g. 100012338" inputmode="numeric"><button class="btn primary" id="t2digitsGo">Generate</button></div>
+        <p class="lead" style="margin-bottom:6px">Type the last two digits of your ID: the first gives the <b>row</b>, the second the <b>column</b> of the random-digit table. The digits are read to the right from there; a word with only one next word uses no digit.</p>
+        <div class="row wrap-sm" style="flex-wrap:nowrap"><input type="text" id="t2digits" class="mono" placeholder="e.g. 06" inputmode="numeric"><button class="btn primary" id="t2digitsGo">Generate</button></div>
         <div class="sub" id="t2digitsOut"></div>
+        <div id="t2digitGrid" style="margin-top:8px"></div>
       </div>
     </div>
     <div class="stack">
@@ -244,14 +250,15 @@ a.cite:hover{text-decoration:underline}
   <div class="layout">
     <div class="stack">
       <div class="card">
-        <h2>3 · Naive Bayes in NLP</h2>
-        <p class="lead">Data from <a class="cite" href="#tab4">[1]</a>; method as in <a class="cite" href="#tab4">[2]</a>. Score(C) = P(C) × P(word₁ | C) × P(word₂ | C) × …, and P(C | review) = Score(C) ÷ (sum of all scores). Words that never occur in training are dropped.</p>
+        <h2>3 · Bayes' rule and Naive Bayes</h2>
+        <p class="lead">Shapes from <a class="cite" href="#tab4">[2]</a>, reviews from <a class="cite" href="#tab4">[1]</a>. Score(C) = P(C) × P(word₁ | C) × P(word₂ | C) × …, and P(C | review) = Score(C) ÷ (sum of all scores): Bayes' rule, with the sum of the scores as the denominator. Words that never occur in training are dropped.</p>
         <h3>Data set</h3>
         <div class="seg" id="t3data">
+          <button data-d="shapes">Shapes (slide 60, task 3.1)</button>
           <button data-d="sent" class="active">Movie reviews (B.3)</button>
-          <button data-d="genre">Comedy or action (Ex. B.2)</button>
+          <button data-d="genre">Comedy or action (Extra)</button>
         </div>
-        <h3>Training reviews (one per line: class | words)</h3>
+        <h3 id="t3trainLab">Training reviews (one per line: class | words)</h3>
         <textarea id="t3train" class="mono" rows="6" spellcheck="false"></textarea>
         <div class="row"><button class="btn" id="t3resetData">Reset this data set</button></div>
         <div class="sub" id="t3stats"></div>
@@ -259,10 +266,14 @@ a.cite:hover{text-decoration:underline}
         <div class="ctl"><div class="lab"><span id="t3priorLab">Prior</span><b id="t3priorV"></b></div><input type="range" id="t3prior" min="1" max="99" value="40"></div>
         <div class="row"><button class="btn" id="t3priorReset">Prior from the data</button></div>
       </div>
+      <div class="card" id="t3jointCard" hidden>
+        <h3>Task 3.1: the joint table (colour × class)</h3>
+        <details id="t3jointBox"><summary>Show the answers to 3.1</summary><div id="t3joint" style="margin-top:8px"></div></details>
+      </div>
       <div class="card">
         <h3>Likelihoods P(word | class)</h3>
         <div class="scroll" id="t3table"></div>
-        <div class="sub" style="margin-top:6px">P(w | C) = (count + k) ÷ (words in class C + k·|V|). Words of the current review are highlighted.</div>
+        <div class="sub" style="margin-top:6px" id="t3likNote">P(w | C) = (count + k) ÷ (words in class C + k·|V|). Words of the current review are highlighted.</div>
       </div>
     </div>
     <div class="stack">
@@ -297,9 +308,9 @@ a.cite:hover{text-decoration:underline}
     <h2>References</h2>
     <ol class="refs">
       <li id="ref1"><span class="rn">[1]</span>D. Jurafsky and J. H. Martin. <i>Speech and Language Processing</i>, 3rd ed. draft, 2026. Appendix B: Naive Bayes, Text Classification, and Sentiment. <a href="https://web.stanford.edu/~jurafsky/slp3/B.pdf" target="_blank" rel="noopener">https://web.stanford.edu/~jurafsky/slp3/B.pdf</a>
-        <div class="sub">Tab 3: the movie reviews are the worked example of Section B.3; <i>Comedy or action</i> is Exercise B.2.</div></li>
+        <div class="sub">Tab 3: the movie reviews are the worked example of Section B.3; <i>Comedy or action</i> (the Extra) is Exercise B.2.</div></li>
       <li id="ref2"><span class="rn">[2]</span>R. Bresson and Z. Iklassov. <i>Week 5: Introduction to Probability for AI</i>. AI1010 lecture slides, MBZUAI, 2026.
-        <div class="sub">Tabs 1–3 follow its notation: densities and areas (slides 50–53), the Markov chain and next-token prediction (slides 54–55), Naive Bayes (slide 60).</div></li>
+        <div class="sub">Tabs 1–3 follow its notation: densities and areas (slides 50–53), the Markov chain and next-token prediction (slides 54–55), Bayes' rule (slide 38) and Naive Bayes (slide 60). Tab 3's <i>Shapes</i> are the five shapes of slide 60.</div></li>
     </ol>
     <p class="sub">The Tab 2 corpus was written for this lab.</p>
   </div>
@@ -450,11 +461,11 @@ const DISTS = {
     ymax: () => Math.max(0.25, 1.2 * gauss(0, 0, T1.normal.sd)),
     outline: null,
     breaks: () => [T1.normal.mu],
-    params: [["mu", "Mean μ", 30, 46, 0.5, " °C"], ["sd", "Spread σ", 0.3, 6, 0.1, " °C"]],
-    presets: [["36 ≤ X ≤ 40", 36, 40], ["X > 40", 40, "max"], ["X > 42", 42, "max"], ["σ = 2", "sd2"], ["σ = 4", "sd4"]],
+    params: [["mu", "Centre", 30, 46, 0.5, " °C"], ["sd", "68% of the area within ±", 0.3, 6, 0.1, " °C of the centre"]],
+    presets: [["36 ≤ X ≤ 40", 36, 40], ["X > 40", 40, "max"], ["X > 42", 42, "max"], ["Normal width", "sd2"], ["Twice as wide", "sd4"]],
     start: [36, 40],
-    tips: ["μ ± σ holds about 68% of the area; μ ± 2σ about 95%.",
-      "Press <b>σ = 4</b>: the bell spreads, the peak halves, and P(36 ≤ X ≤ 40) drops to 0.38.",
+    tips: ["About 68% of the area lies within 2 °C of the centre (36–40 °C), and about 95% within 4 °C (34–42 °C).",
+      "Press <b>Twice as wide</b>: the bell spreads, the peak halves, and P(36 ≤ X ≤ 40) drops to 0.38.",
       "Throw darts: the fraction that lands in the interval matches the area."],
   },
 };
@@ -684,8 +695,16 @@ function digitRanges(lm, a) {
   if (!n || 10 % n) return null;
   let s = 0; return list.map(([w, c]) => { const size = 10 * c / n, r = [w, s, s + size - 1]; s += size; return r; });
 }
-function generateWithDigits(lm, digitStr) {
-  const stream = digitStr.replace(/\D/g, "").split("").reverse().map(Number);
+// 2.2: the last two ID digits give a row and a column of this table (the same digits as in the handout).
+const DIGIT_TABLE = "2772656818117403534322355636784621209629232037629809398495858576014643687942095204109348939557017381";
+function idStream(str) {
+  const d = String(str).replace(/\D/g, "");
+  if (d.length < 2) return null;
+  const start = +d.slice(-2);
+  return { start, stream: Array.from({ length: 12 }, (_, k) => +DIGIT_TABLE[(start + k) % 100]) };
+}
+function generateWithDigits(lm, digits) {
+  const stream = [...digits];
   const steps = []; let a = START, guard = 0;
   while (a !== END && guard++ < 40) {
     const list = lm.order.get(a);
@@ -716,7 +735,7 @@ function rebuildLM() {
   clearInterval(T2.timer); T2.lm = buildLM(T2.text); T2.words = []; T2.digitsUsed = []; T2.view = START; T2.lastPick = null;
   const lm = T2.lm;
   $("#t2stats").textContent = `${lm.sents.length} sentences · ${lm.vocab.length - (lm.vocab.includes(END) ? 1 : 0)} words + “.”`;
-  $("#t2list").innerHTML = ""; $("#t2genSum").textContent = ""; $("#t2digitsOut").textContent = "";
+  $("#t2list").innerHTML = ""; $("#t2genSum").textContent = ""; $("#t2digitsOut").textContent = ""; renderDigitGrid(null, 0);
   renderT2Table(); renderT2(); runScore();
 }
 function renderT2Table() {
@@ -761,11 +780,11 @@ function renderT2() {
     const row = h("div", { class: "bar" + (T2.lastPick === o.w && view === T2.pickCtx ? " picked" : "") },
       h("div", { class: "w" }, o.w),
       h("div", { class: "track" }, h("div", { class: "fill", style: `width:${(o.q * 100).toFixed(2)}%` }), h("div", { class: "ghost", style: `left:calc(${(o.p * 100).toFixed(2)}% - 1px)`, title: "T = 1" })),
-      h("div", { class: "v" }, Math.abs(Tv - 1) < 0.005 ? `P = ${fmt(o.p, 3)}` : `${fmt(o.p, 3)} → ${fmt(o.q, 3)}`));
+      h("div", { class: "v" }, Math.abs(Tv - 1) < 0.005 ? `p = ${fmt(o.p, 3)}` : `p ${fmt(o.p, 3)} → q ${fmt(o.q, 3)}`));
     bars.append(row);
   }
   if (list.length > 12) bars.append(h("div", { class: "sub" }, `+ ${list.length - 12} more words with tiny probabilities (smoothing).`));
-  if (shown.length && Math.abs(Tv - 1) >= 0.005) bars.append(h("div", { class: "sub" }, "Bars: probability used for sampling at this T. Orange tick: the model's own P (T = 1)."));
+  if (shown.length && Math.abs(Tv - 1) >= 0.005) bars.append(h("div", { class: "sub" }, "Bars: qᵢ, the probability used for sampling at this T. Orange tick: the model's own pᵢ (T = 1)."));
   $("#t2step").disabled = done; $("#t2gen").disabled = done;
   drawGraph();
 }
@@ -809,16 +828,32 @@ $("#t2gen20").addEventListener("click", () => {
 });
 $("#t2digitsGo").addEventListener("click", runDigits);
 $("#t2digits").addEventListener("keydown", e => { if (e.key === "Enter") runDigits(); });
+function renderDigitGrid(start, used) {
+  const box = $("#t2digitGrid"); if (!box) return;
+  let html = '<table class="dg"><tr><th></th>' + [...Array(10).keys()].map(c => `<th>${c}</th>`).join("") + "</tr>";
+  for (let r = 0; r < 10; r++) {
+    html += `<tr><th>${r}</th>`;
+    for (let c = 0; c < 10; c++) {
+      const i = 10 * r + c, k = (i - start + 100) % 100;
+      html += `<td class="${start != null && k < used ? "used" : ""}${i === start ? " start" : ""}">${DIGIT_TABLE[i]}</td>`;
+    }
+    html += "</tr>";
+  }
+  box.innerHTML = html + "</table>";
+}
 function runDigits() {
   clearInterval(T2.timer);
-  const r = generateWithDigits(T2.lm, $("#t2digits").value);
-  const out = $("#t2digitsOut");
+  const out = $("#t2digitsOut"), id = idStream($("#t2digits").value);
+  if (!id) { out.innerHTML = '<span class="badge red">!</span> Type at least the last two digits of your ID.'; renderDigitGrid(null, 0); return; }
+  const r = generateWithDigits(T2.lm, id.stream);
+  const nUsed = r.steps ? r.steps.filter(x => x.d !== null).length : 0;
+  renderDigitGrid(id.start, nUsed);
   if (r.error && !r.steps) { out.innerHTML = `<span class="badge red">!</span> ${esc(r.error)}`; return; }
   T2.words = r.steps.map(s => s.w); T2.digitsUsed = r.steps.map(s => s.d); T2.view = curWord(); T2.lastPick = null;
   if (r.error) out.innerHTML = `<span class="badge red">!</span> ${esc(r.error)}`;
   else {
     const s = T2.words.join(" "), p = scoreSentence(T2.lm, T2.words.slice(0, -1), 0).p;
-    out.innerHTML = `Digits used: <b>${r.steps.filter(x => x.d !== null).map(x => x.d).join(", ") || "none"}</b> → <span class="mono">${esc(s)}</span> · P = <b>${fmt(p, 3)}</b> ${T2.lm.corpusSet.has(s) ? '<span class="badge gray">in corpus</span>' : '<span class="badge orange">new sentence!</span>'}`;
+    out.innerHTML = `Row ${Math.floor(id.start / 10)}, column ${id.start % 10}. Digits used: <b>${r.steps.filter(x => x.d !== null).map(x => x.d).join(", ") || "none"}</b> → <span class="mono">${esc(s)}</span> · P = <b>${fmt(p, 3)}</b> ${T2.lm.corpusSet.has(s) ? '<span class="badge gray">in corpus</span>' : '<span class="badge orange">new sentence!</span>'}`;
   }
   renderT2();
 }
@@ -918,33 +953,40 @@ function drawGraph() {
 /* ============================================================ TAB 3: Naive Bayes */
 // Data sets from reference [1] (References tab): Section B.3 and Exercise B.2.
 const NB_SETS = {
+  // Slide 60 of the lecture [2]: each shape is a colour and a shape; P(feature | class) is a fraction of shapes.
+  shapes: { perItem: true, train: ["A | red square", "B | red square", "A | red circle", "B | blue square", "A | blue triangle"].join("\n"), test: "red",
+    chips: [["red (3.1c)", "red"], ["red square (3.1d)", "red square"], ["blue", "blue"], ["blue triangle", "blue triangle"]] },
   sent: { train: ["neg | just plain boring", "neg | entirely predictable and lacks energy", "neg | no surprises and very few laughs",
     "pos | very powerful", "pos | the most fun film of the summer"].join("\n"), test: "predictable with no fun",
     chips: [["Textbook test review", "predictable with no fun"], ["not boring at all", "not boring at all"], ["the film was not fun", "the film was not fun"],
       ["very powerful", "very powerful"], ["No known words", "what a wonderful day"]] },
   genre: { train: ["comedy | fun, couple, love, love", "action | fast, furious, shoot", "comedy | couple, fly, fast, fun, fun",
     "action | furious, shoot, shoot, fun", "action | fly, fast, shoot, love"].join("\n"), test: "fast, couple, shoot, fly",
-    chips: [["Exercise B.2: D", "fast, couple, shoot, fly"], ["love, fun", "love, fun"], ["shoot", "shoot"]] },
+    chips: [["Extra: D", "fast, couple, shoot, fly"], ["love, fun", "love, fun"], ["shoot", "shoot"]] },
 };
 const NB_ALPHAS = [0, 0.5, 1, 2, 5];
 const nbTokens = str => (str.toLowerCase().replace(/[\u2018\u2019]/g, "'").match(/[a-z']+/g) || []).map(w => w.replace(/^'+|'+$/g, "")).filter(Boolean);
-function nbTrain(text) {
+function nbTrain(text, perItem) {
   const docs = [];
   for (const line of text.split("\n")) {
     const i = line.indexOf("|"); if (i < 0) continue;
     const c = line.slice(0, i).trim(), words = nbTokens(line.slice(i + 1));
     if (c && words.length) docs.push([c, words]);
   }
-  const classes = [...new Set(docs.map(d => d[0]))], counts = {}, nDocs = {}, totals = {}, vocab = new Set();
-  for (const c of classes) { counts[c] = {}; nDocs[c] = 0; totals[c] = 0; }
+  const classes = [...new Set(docs.map(d => d[0]))], counts = {}, docCounts = {}, nDocs = {}, totals = {}, vocab = new Set();
+  for (const c of classes) { counts[c] = {}; docCounts[c] = {}; nDocs[c] = 0; totals[c] = 0; }
   for (const [c, words] of docs) {
     nDocs[c]++;
     for (const w of words) { counts[c][w] = (counts[c][w] || 0) + 1; totals[c]++; }
+    for (const w of new Set(words)) docCounts[c][w] = (docCounts[c][w] || 0) + 1;
     words.forEach(w => vocab.add(w));
   }
-  return { docs, classes, counts, nDocs, totals, vocab };
+  return { docs, classes, counts, docCounts, nDocs, totals, vocab, perItem: !!perItem };
 }
-function nbLik(m, w, c, a) { const den = m.totals[c] + a * m.vocab.size; return den ? ((m.counts[c][w] || 0) + a) / den : 0; }
+function nbLik(m, w, c, a) {
+  if (m.perItem) return m.nDocs[c] ? (m.docCounts[c][w] || 0) / m.nDocs[c] : 0; // slide 60: fraction of the class's shapes, no smoothing
+  const den = m.totals[c] + a * m.vocab.size; return den ? ((m.counts[c][w] || 0) + a) / den : 0;
+}
 // st = {alpha, prior2}; prior2 = P(second class), or null for the training frequency.
 function nbRun(m, text, st) {
   const [c1, c2] = m.classes, toks = nbTokens(text);
@@ -975,8 +1017,8 @@ const NB_CHALLENGES = [
 ];
 const T3 = { set: "sent", train: NB_SETS.sent.train, text: NB_SETS.sent.test, alpha: 1, prior2: null, solved: {} };
 function renderT3() {
-  const m = nbTrain(T3.train);
-  $("#t3alphaV").textContent = T3.alpha === 0 ? "0 (off)" : T3.alpha === 1 ? "1 (add-one, as in the textbook)" : String(T3.alpha);
+  const m = nbTrain(T3.train, NB_SETS[T3.set].perItem);
+  $("#t3alphaV").textContent = NB_SETS[T3.set].perItem ? "not used for shapes" : T3.alpha === 0 ? "0 (off)" : T3.alpha === 1 ? "1 (add-one, as in the textbook)" : String(T3.alpha);
   if (m.classes.length !== 2) {
     $("#t3stats").innerHTML = `<span class="badge red">!</span> The training data needs exactly two classes; it has ${m.classes.length}.`;
     for (const id of ["t3tokens", "t3calc", "t3table", "t3ev", "t3chal"]) $("#" + id).innerHTML = "";
@@ -984,7 +1026,13 @@ function renderT3() {
     return;
   }
   const st = T3, r = nbRun(m, T3.text, st), { c1, c2 } = r;
-  $("#t3stats").textContent = `${m.docs.length} reviews · ${c1}: ${m.nDocs[c1]} (${m.totals[c1]} words) · ${c2}: ${m.nDocs[c2]} (${m.totals[c2]} words) · |V| = ${m.vocab.size}`;
+  $("#t3stats").textContent = m.perItem ? `${m.docs.length} shapes · ${c1}: ${m.nDocs[c1]} · ${c2}: ${m.nDocs[c2]} · P(feature | class) = fraction of the class's shapes, as on slide 60 (no smoothing)`
+    : `${m.docs.length} reviews · ${c1}: ${m.nDocs[c1]} (${m.totals[c1]} words) · ${c2}: ${m.nDocs[c2]} (${m.totals[c2]} words) · |V| = ${m.vocab.size}`;
+  $("#t3alpha").disabled = m.perItem;
+  $("#t3likNote").textContent = m.perItem ? "P(feature | C) = (shapes of class C with that feature) ÷ (shapes of class C). Features of the current item are highlighted."
+    : "P(w | C) = (count + k) ÷ (words in class C + k·|V|). Words of the current review are highlighted.";
+  $("#t3jointCard").hidden = !m.perItem;
+  if (m.perItem) renderJoint(m);
   $("#t3priorLab").textContent = `Prior P(${c2})` + (T3.prior2 == null ? " (from the data)" : "");
   $("#t3priorV").textContent = r.p2.toFixed(2);
   $("#t3prior").value = Math.round(r.p2 * 100);
@@ -1020,8 +1068,9 @@ function renderT3() {
   const vocab = [...m.vocab].sort((x, y) => inReview.has(y) - inReview.has(x) || x.localeCompare(y));
   $("#t3table").innerHTML = `<table class="t"><tr><th class="l">word</th><th>count ${esc(c1)}</th><th>P(w|${esc(c1)})</th><th>count ${esc(c2)}</th><th>P(w|${esc(c2)})</th><th>factor ${esc(c2)}:${esc(c1)}</th></tr>` +
     vocab.map(w => { const a1 = nbLik(m, w, c1, st.alpha), a2 = nbLik(m, w, c2, st.alpha), f = a1 ? a2 / a1 : Infinity;
-      return `<tr class="${inReview.has(w) ? "hit" : ""}"><td class="w l">${esc(w)}</td><td>${m.counts[c1][w] || 0}</td><td>${fmt(a1, 3)}</td><td>${m.counts[c2][w] || 0}</td><td>${fmt(a2, 3)}</td><td><b style="color:${f > 1 ? "#B65C1A" : f < 1 ? "#147D7B" : "#53616C"}">${Number.isNaN(f) ? "0/0" : fmt(f, 3)}</b></td></tr>`; }).join("") +
-    `<tr><td class="l"><b>total</b></td><td>${m.totals[c1]}</td><td></td><td>${m.totals[c2]}</td><td></td><td></td></tr></table>`;
+      const k1 = (m.perItem ? m.docCounts : m.counts)[c1][w] || 0, k2 = (m.perItem ? m.docCounts : m.counts)[c2][w] || 0;
+      return `<tr class="${inReview.has(w) ? "hit" : ""}"><td class="w l">${esc(w)}</td><td>${k1}</td><td>${fmt(a1, 3)}</td><td>${k2}</td><td>${fmt(a2, 3)}</td><td><b style="color:${f > 1 ? "#B65C1A" : f < 1 ? "#147D7B" : "#53616C"}">${Number.isNaN(f) ? "0/0" : fmt(f, 3)}</b></td></tr>`; }).join("") +
+    `<tr><td class="l"><b>${m.perItem ? "shapes" : "total"}</b></td><td>${m.perItem ? m.nDocs[c1] : m.totals[c1]}</td><td></td><td>${m.perItem ? m.nDocs[c2] : m.totals[c2]}</td><td></td><td></td></tr></table>`;
   // challenges (movie-review data)
   const box = $("#t3chal");
   if (T3.set !== "sent") box.innerHTML = `<div class="sub">The challenges use the movie-review data set.</div>`;
@@ -1030,6 +1079,22 @@ function renderT3() {
     if (T3.holdChal !== chalKey) { T3.holdChal = null; for (const c of NB_CHALLENGES) if (!st.solved[c.id] && T3.text.trim() && c.test(r, st, m)) st.solved[c.id] = T3.text.trim(); }
     box.innerHTML = NB_CHALLENGES.map((c, i) => `<div class="chal${st.solved[c.id] ? " done" : ""}"><div class="st">${st.solved[c.id] ? "✓" : i + 1}</div><div><b>${c.title}.</b> ${c.text}${st.solved[c.id] ? `<span class="by">solved by: “${esc(st.solved[c.id].slice(0, 90))}”</span>` : ""}</div></div>`).join("");
   }
+}
+// Task 3.1: joint table of the first word (colour) and the class, with marginals, conditionals and Bayes' rule.
+function renderJoint(m) {
+  const [A, B] = m.classes, n = m.docs.length, colours = [...new Set(m.docs.map(d => d[1][0]))];
+  const frac = (a, b) => { const g = (x, y) => (y ? g(y, x % y) : x), k = g(a, b) || 1; return b / k === 1 ? String(a / k) : `${a / k}/${b / k}`; };
+  const cnt = (col, c) => m.docs.filter(d => d[1][0] === col && d[0] === c).length;
+  const rowT = col => m.docs.filter(d => d[1][0] === col).length;
+  let html = `<table class="t"><tr><th></th><th>${esc(A)}</th><th>${esc(B)}</th><th>P(colour)</th></tr>`;
+  for (const col of colours) html += `<tr><td class="w l">${esc(col)}</td><td>${frac(cnt(col, A), n)}</td><td>${frac(cnt(col, B), n)}</td><td><b>${frac(rowT(col), n)}</b></td></tr>`;
+  html += `<tr><td class="l"><b>P(class)</b></td><td><b>${frac(m.nDocs[A], n)}</b></td><td><b>${frac(m.nDocs[B], n)}</b></td><td>1</td></tr></table>`;
+  const c0 = colours[0], rA = cnt(c0, A), rB = cnt(c0, B);
+  html += `<div class="calc" style="margin-top:8px">P(${esc(c0)} | ${esc(A)}) = ${frac(rA, n)} ÷ ${frac(m.nDocs[A], n)} = <b>${frac(rA, m.nDocs[A])}</b>` +
+    `<br>P(${esc(c0)} | ${esc(B)}) = ${frac(rB, n)} ÷ ${frac(m.nDocs[B], n)} = <b>${frac(rB, m.nDocs[B])}</b>` +
+    `<br>P(${esc(c0)}) = ${frac(rA, m.nDocs[A])} · ${frac(m.nDocs[A], n)} + ${frac(rB, m.nDocs[B])} · ${frac(m.nDocs[B], n)} = <b>${frac(rA + rB, n)}</b> (total probability)` +
+    `<br>Bayes: P(${esc(B)} | ${esc(c0)}) = ${frac(rB, m.nDocs[B])} · ${frac(m.nDocs[B], n)} ÷ ${frac(rA + rB, n)} = <b>${frac(rB, rA + rB)}</b>, but P(${esc(c0)} | ${esc(B)}) = ${frac(rB, m.nDocs[B])}</div>`;
+  $("#t3joint").innerHTML = html;
 }
 function drawEvidence(r) {
   const svg = $("#t3ev"), W = 640, rowH = 30, rows = r.items.map(it => ({ label: it.kind === "prior" ? "prior odds" : it.label, f: it.f2 / it.f1, kind: it.kind }));
@@ -1053,7 +1118,9 @@ function drawEvidence(r) {
   });
 }
 function loadNBSet(key) {
-  T3.set = key; T3.train = NB_SETS[key].train; T3.text = NB_SETS[key].test; T3.prior2 = null; T3.alpha = 1; $("#t3alpha").value = 2;
+  T3.set = key; T3.train = NB_SETS[key].train; T3.text = NB_SETS[key].test; T3.prior2 = null;
+  T3.alpha = NB_SETS[key].perItem ? 0 : 1; $("#t3alpha").value = NB_SETS[key].perItem ? 0 : 2;
+  $("#t3trainLab").textContent = NB_SETS[key].perItem ? "Training shapes (one per line: class | colour shape)" : "Training reviews (one per line: class | words)";
   $("#t3train").value = T3.train; $("#t3msg").value = T3.text;
   $$("#t3data button").forEach(b => b.classList.toggle("active", b.dataset.d === key));
   const chips = $("#t3chips"); chips.innerHTML = "";
@@ -1083,14 +1150,15 @@ function selftest() {
   ok("1.1 P(W<=5)", U.cdf(5) - U.cdf(0), 0.25); ok("1.1 P(8<=W<=14)", U.cdf(14) - U.cdf(8), 0.3); ok("1.1 height", U.pdf(3), 0.05);
   ok("1.2 P(T<=25)", Tr.cdf(25), 0.125); ok("1.2 P(25<=T<=35)", Tr.cdf(35) - Tr.cdf(25), 0.75); ok("1.2 P(25<=T<=30)", Tr.cdf(30) - Tr.cdf(25), 0.375); ok("1.2 peak", Tr.pdf(30), 0.1);
   ok("1.3 P(36<=X<=40)", N.cdf(40) - N.cdf(36), 0.6827); ok("1.3 P(X>42)", 1 - N.cdf(42), 0.0228);
-  T1.normal.sd = 4; ok("1.3 sigma 4: P(36<=X<=40)", N.cdf(40) - N.cdf(36), 0.3829); ok("1.3 sigma 4 peak", N.pdf(38), 0.0997);
+  T1.normal.sd = 4; ok("1.3 twice as wide: P(36<=X<=40)", N.cdf(40) - N.cdf(36), 0.3829); ok("1.3 twice as wide: peak", N.pdf(38), 0.0997);
   const sv = JSON.parse(save); T1.uniform = sv.u; T1.triangle = sv.t; T1.normal = sv.n;
   const lm = buildLM(DEFAULT_CORPUS), P = (a, b) => (nextList(lm, a, 0).find(o => o.w === b) || { p: 0 }).p;
   ok("2.1 P(study|i)", P("i", "study"), 0.8); ok("2.1 P(ai|study)", P("study", "ai"), 0.6); ok("2.1 P(.|ai)", P("ai", "."), 0.6); ok("2.1 P(is|ai)", P("ai", "is"), 0.2);
   ok("2.1 START digits", digitRanges(lm, START).map(r => r.join(":")).join(" "), "i:0:4 we:5:6 robots:7:8 ai:9:9");
   ok("2.1 ai digits", digitRanges(lm, "ai").map(r => r.join(":")).join(" "), ".:0:5 at:6:7 is:8:9");
-  ok("2.2 digits ...38", generateWithDigits(lm, "2026138").steps.map(s => s.w).join(" "), "robots are fun .");
-  ok("2.2 digits 6005 (read right to left: 5,0,0,6)", generateWithDigits(lm, "6005").steps.map(s => s.w).join(" "), "we study ai at mbzuai .");
+  ok("2.2 ID ...06: row 0, column 6", generateWithDigits(lm, idStream("202645106").stream).steps.map(s => s.w).join(" "), "we love coffee .");
+  ok("2.2 ID ...67", generateWithDigits(lm, idStream("67").stream).steps.map(s => s.w).join(" "), "we study ai at mbzuai .");
+  ok("2.2 digit table matches the handout", DIGIT_TABLE.length === 100 && DIGIT_TABLE.slice(0, 10) === "2772656818" && DIGIT_TABLE.slice(90) === "9557017381", true);
   ok("2.3 P(i study ai .)", scoreSentence(lm, ["i", "study", "ai"], 0).p, 0.144, 1e-9);
   ok("2.3 P(ai is everywhere .)", scoreSentence(lm, ["ai", "is", "everywhere"], 0).p, 0, 0);
   ok("2.3 P(i study ai is fun .)", scoreSentence(lm, "i study ai is fun".split(" "), 0).p, 0.048, 1e-9);
@@ -1099,14 +1167,18 @@ function selftest() {
   const t05 = temper(nextList(lm, START, 0), 0.5), t2 = temper(nextList(lm, START, 0), 2);
   ok("2.3 T=0.5 P(i)", t05[0].q, 0.7353); ok("2.3 T=2 P(i)", t2[0].q, 0.3687); ok("2.3 T=2 P(ai)", t2[3].q, 0.1649);
   const mS = nbTrain(NB_SETS.sent.train), one = { alpha: 1, prior2: null }, rT = nbRun(mS, NB_SETS.sent.test, one);
-  ok("3.1 |V|", mS.vocab.size, 20); ok("3.1 words in neg", mS.totals.neg, 14); ok("3.1 words in pos", mS.totals.pos, 9);
-  ok("3.1 P(fun|pos) = 2/29", nbLik(mS, "fun", "pos", 1), 2 / 29, 1e-12); ok("3.1 dropped word", rT.toks.filter(t => !mS.vocab.has(t)).join(), "with");
-  ok("3.2 Score(neg)", Math.exp(rT.l1), 6.106e-5, 5e-8); ok("3.2 Score(pos)", Math.exp(rT.l2), 3.280e-5, 5e-8); ok("3.2 P(pos | review)", rT.post, 0.3495);
-  ok("3.3 without +1: 0/0", nbRun(mS, NB_SETS.sent.test, { alpha: 0, prior2: null }).post, null);
+  ok("3.2 |V|", mS.vocab.size, 20); ok("3.2 words in neg", mS.totals.neg, 14); ok("3.2 words in pos", mS.totals.pos, 9);
+  ok("3.2 P(fun|pos) = 2/29", nbLik(mS, "fun", "pos", 1), 2 / 29, 1e-12); ok("3.2 dropped word", rT.toks.filter(t => !mS.vocab.has(t)).join(), "with");
+  ok("3.3 Score(neg)", Math.exp(rT.l1), 6.106e-5, 5e-8); ok("3.3 Score(pos)", Math.exp(rT.l2), 3.280e-5, 5e-8); ok("3.3 P(pos | review)", rT.post, 0.3495);
+  ok("3.4 without +1: 0/0", nbRun(mS, NB_SETS.sent.test, { alpha: 0, prior2: null }).post, null);
   ok("3.5 not boring at all", nbRun(mS, "not boring at all", one).post, 0.2810); ok("3.5 the film was not fun", nbRun(mS, "the film was not fun", one).post, 0.9280);
   ok("3.5 not predictable at all", nbRun(mS, "not predictable at all", one).post, 0.2805);
   ok("flip with powerful", nbRun(mS, "predictable with no fun powerful", one).post, 0.5574); ok("prior only", nbRun(mS, "what a wonderful day", one).post, 0.4);
-  ok("3.4 P(action | D)", nbRun(nbTrain(NB_SETS.genre.train), NB_SETS.genre.test, one).post, 0.7007);
+  ok("Extra P(action | D)", nbRun(nbTrain(NB_SETS.genre.train), NB_SETS.genre.test, one).post, 0.7007);
+  const mSh = nbTrain(NB_SETS.shapes.train, true), zero = { alpha: 0, prior2: null };
+  ok("3.1 P(red | A) = 2/3", nbLik(mSh, "red", "A", 0), 2 / 3, 1e-12); ok("3.1 P(red | B) = 1/2", nbLik(mSh, "red", "B", 0), 0.5, 1e-12);
+  ok("3.1(c) P(B | red) = 1/3", nbRun(mSh, "red", zero).post, 1 / 3, 1e-12);
+  ok("3.1(d) slide 60: P(A | red, square) = 0.4", 1 - nbRun(mSh, "red square", zero).post, 0.4, 1e-12);
   const box = $("#selftest"); box.style.display = "block";
   box.textContent = (fails ? `SELFTEST FAIL (${fails})` : "SELFTEST PASS") + "\n" + lines.join("\n");
   document.title = fails ? "SELFTEST FAIL" : "SELFTEST PASS";
