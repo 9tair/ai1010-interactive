@@ -537,7 +537,8 @@ function renderT1() {
   svgEl("line", { x1: m.l, x2: W - m.r, y1: Y(0), y2: Y(0), stroke: "#53616C", "stroke-width": 1.2 }, svg);
   svgEl("line", { x1: m.l, x2: m.l, y1: m.t, y2: Y(0), stroke: "#53616C", "stroke-width": 1.2 }, svg);
   svgText(svg, W - m.r, H - 8, `${D.sym} (${D.unit})`, { "text-anchor": "end", "font-size": 14, fill: "#53616C" });
-  svgText(svg, 16, m.t + 4, "density", { "font-size": 14, fill: "#53616C" });
+  const yMid = (m.t + H - m.b) / 2; // axis title runs along the axis, clear of the tick labels
+  svgText(svg, 20, yMid, "density", { "font-size": 14, fill: "#53616C", "text-anchor": "middle", transform: `rotate(-90 20 ${yMid})` });
   const pts = [];
   const pathFrom = arr => arr.map((p, i) => (i ? "L" : "M") + X(p[0]).toFixed(1) + "," + Y(p[1]).toFixed(1)).join("");
   // curve samples, with exact corners for the piecewise shapes
@@ -571,11 +572,19 @@ function renderT1() {
   }
   svgEl("path", { d: pathFrom(outline), fill: "none", stroke: "#17324D", "stroke-width": 3, "stroke-linejoin": "round" }, svg);
   // handles
-  for (const [key, val] of [["lo", T1.lo], ["hi", T1.hi]]) {
-    const gx = X(val);
-    svgEl("line", { x1: gx, x2: gx, y1: m.t, y2: Y(0), stroke: "#B65C1A", "stroke-width": 1.6, "stroke-dasharray": "5 4" }, svg);
-    svgEl("circle", { cx: gx, cy: Y(0), r: 9, fill: "#fff", stroke: "#B65C1A", "stroke-width": 3, style: "cursor:ew-resize" }, svg);
-    svgText(svg, gx + (key === "lo" ? -6 : 6), m.t + 12, (key === "lo" ? "a = " : "b = ") + fmtNum(val), { "text-anchor": key === "lo" ? "end" : "start", "font-size": 14, "font-weight": 700, fill: "#B65C1A" });
+  // Handle labels: a to the left of its line, b to the right, but kept inside the plot and apart from each other.
+  const lab = [["lo", T1.lo], ["hi", T1.hi]].map(([key, val]) => {
+    const gx = X(val), text = (key === "lo" ? "a = " : "b = ") + fmtNum(val), w = 8.4 * text.length;
+    let x0 = key === "lo" ? gx - 6 - w : gx + 6;
+    if (x0 < m.l + 4) x0 = gx + 6; // no room left of the line: put it on the right
+    if (x0 + w > W - m.r) x0 = gx - 6 - w; // no room on the right: put it on the left
+    return { key, val, gx, text, x0, w, y: m.t + 12 };
+  });
+  if (lab[0].x0 + lab[0].w + 6 > lab[1].x0 && lab[1].x0 + lab[1].w + 6 > lab[0].x0) lab[1].y += 18; // would touch: drop b one line
+  for (const L of lab) {
+    svgEl("line", { x1: L.gx, x2: L.gx, y1: m.t, y2: Y(0), stroke: "#B65C1A", "stroke-width": 1.6, "stroke-dasharray": "5 4" }, svg);
+    svgEl("circle", { cx: L.gx, cy: Y(0), r: 9, fill: "#fff", stroke: "#B65C1A", "stroke-width": 3, style: "cursor:ew-resize" }, svg);
+    svgText(svg, L.x0, L.y, L.text, { "text-anchor": "start", "font-size": 14, "font-weight": 700, fill: "#B65C1A" });
   }
   const p = probT1();
   if (T1.hi - T1.lo > (x1 - x0) * 0.06) {
